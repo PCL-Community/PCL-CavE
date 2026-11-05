@@ -189,7 +189,7 @@ public sealed class ModpackUiBridge : IModpackUi
         }
 
         // 成功时清理备份；失败或取消时只回滚本次安装创建的路径（必要时从 PCLInstallBackups 还原）
-        McInstallRecovery.HandleTerminalState(loader, combo?.input?.ToString() ?? "");
+        McInstallRecovery.HandleTerminalState(loader.State, combo?.input?.ToString() ?? "");
         Loading.LoaderFolderRun(
             InstanceList.mcInstanceListLoader,
             GameFolders.mcFolderSelected ?? "",

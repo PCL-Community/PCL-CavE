@@ -9,25 +9,23 @@ on:
       configuration:
         required: true
         type: string
-      architecture:
+      runtime:
         required: true
         type: string
 
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: ${{ startsWith(inputs.runtime, 'win-') && 'windows-latest' || startsWith(inputs.runtime, 'osx-') && 'macos-latest' || 'ubuntu-latest' }}
+    defaults:
+      run:
+        shell: bash
     env:
       LANG: en_US.UTF-8
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set Describe
-        run: |
-          describe=`git describe --tags --always`
-          echo "describe=$describe" >> $GITHUB_ENV
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -46,12 +44,28 @@ jobs:
           PCL_LOBBY_DEFAULT_SECRET: ${{ secrets.LOBBY_DEFAULT_SECRET }}
           PCL_GITHUB_SHA: ${{ github.sha }}
         run: |
-          dotnet publish "Plain Craft Launcher 2/Plain Craft Launcher 2.csproj" \
-          -p:Configuration=${{ inputs.configuration }} -p:Platform=${{ inputs.architecture }} \
-          -p:DeleteExistingFiles=true -o ./artifact --no-self-contained
+          dotnet publish PCL.Launcher/PCL.Launcher.csproj \
+            -c "${{ inputs.configuration }}" -r "${{ inputs.runtime }}" --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:DebugType=None -o ./artifact
+
+      - name: Package desktop application
+        env:
+          PACKAGE: PCL-CavE_${{ inputs.configuration }}_${{ inputs.runtime }}
+          RUNTIME: ${{ inputs.runtime }}
+        run: |
+          mkdir dist
+          if [[ "$RUNTIME" == win-* ]]; then
+            test -s artifact/PCL.Launcher.exe
+            (cd artifact && python -m zipfile -c "../dist/$PACKAGE.zip" *)
+          else
+            test -x artifact/PCL.Launcher
+            tar -czf "dist/$PACKAGE.tar.gz" -C artifact .
+          fi
 
       - name: Upload the Build Artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: PCL2_CE_${{ inputs.configuration }}_${{ inputs.architecture }}
-          path: artifact/**
+          name: PCL-CavE_${{ inputs.configuration }}_${{ inputs.runtime }}
+          path: dist/*
+          if-no-files-found: error

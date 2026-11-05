@@ -51,16 +51,14 @@ public static class McInstallRecovery
 
         var session = new InstallSession
         {
-            InstanceFolder = folder,
             InstanceName = instanceName,
             FolderExisted = Directory.Exists(folder),
             JsonExisted = File.Exists(GetJsonPath(folder, instanceName)),
             JarExisted = File.Exists(GetJarPath(folder, instanceName))
         };
         lock (SyncRoot)
-        {
-            Sessions[folder] = session;
-        }
+            if (!Sessions.TryAdd(folder, session))
+                throw new InvalidOperationException($"实例正在安装：{folder}");
 
         LauncherCommon.Log(
             $"[Install] 记录安装会话：{folder}（目录已存在：{session.FolderExisted}，Json 已存在：{session.JsonExisted}）",
@@ -73,27 +71,19 @@ public static class McInstallRecovery
         var folder = NormalizeFolder(instanceFolder);
         var jsonPath = GetJsonPath(folder, instanceName);
         var jarPath = GetJarPath(folder, instanceName);
+        var backupFolder = Path.Combine(folder, BackupFolderName);
+        if (Directory.Exists(backupFolder) && Directory.EnumerateFileSystemEntries(backupFolder).Any())
+            throw new IOException($"实例仍有安装备份，请先恢复或移走：{backupFolder}");
         if (!File.Exists(jsonPath) && !File.Exists(jarPath))
             return;
-
-        var backupFolder = Path.Combine(folder, BackupFolderName);
-        try
-        {
-            Directory.CreateDirectory(backupFolder);
-            if (File.Exists(jsonPath))
-                LauncherCommon.CopyFile(
-                    jsonPath,
-                    Path.Combine(backupFolder, Path.GetFileName(jsonPath)));
-            if (File.Exists(jarPath))
-                LauncherCommon.CopyFile(
-                    jarPath,
-                    Path.Combine(backupFolder, Path.GetFileName(jarPath)));
-            LauncherCommon.Log($"[Install] 已备份实例核心文件：{backupFolder}");
-        }
-        catch (Exception ex)
-        {
-            LauncherCommon.Log(ex, "备份实例核心文件失败");
-        }
+        Directory.CreateDirectory(backupFolder);
+        if (File.Exists(jsonPath))
+            File.Copy(jsonPath, Path.Combine(backupFolder, Path.GetFileName(jsonPath)), true);
+        if (File.Exists(jarPath))
+            File.Copy(jarPath, Path.Combine(backupFolder, Path.GetFileName(jarPath)), true);
+        lock (SyncRoot)
+            Sessions[folder].BackupPrepared = true;
+        LauncherCommon.Log($"[Install] 已备份实例核心文件：{backupFolder}");
     }
 
     public static void UnregisterSession(string instanceFolder)
@@ -108,47 +98,31 @@ public static class McInstallRecovery
     /// <summary>
     ///     安装加载器进入结束状态后调用：成功时删除备份，失败或取消时回滚到安装前状态。
     /// </summary>
-    public static void HandleTerminalState(Loading.LoaderBase loader, string instanceFolder)
+    public static void HandleTerminalState(LoadState state, string instanceFolder)
     {
-        if (loader.State == LoadState.Finished)
+        if (state == LoadState.Finished)
         {
             var folder = NormalizeFolder(instanceFolder);
-            DeleteBackupQuietly(folder);
+            InstallSession? session;
+            lock (SyncRoot)
+                Sessions.TryGetValue(folder, out session);
+            if (session is null) return;
+            if (session.BackupPrepared) DeleteBackupQuietly(folder);
             UnregisterSession(folder);
             return;
         }
 
-        if (loader.State is not (LoadState.Failed or LoadState.Aborted))
+        if (state is not (LoadState.Failed or LoadState.Aborted))
             return;
 
         RestoreOrCleanup(instanceFolder);
     }
 
-    public static bool TryClearIncompleteInstanceFolder(string instanceFolder, string instanceName)
+    public static bool CanInstallToFolder(string instanceFolder, string instanceName)
     {
         var folder = NormalizeFolder(instanceFolder);
-        if (!Directory.Exists(folder))
-            return true;
-        if (File.Exists(GetJsonPath(folder, instanceName)))
-            return false;
-
-        var backupFolder = Path.Combine(folder, BackupFolderName);
-        if (Directory.Exists(backupFolder))
-            try
-            {
-                LauncherCommon.DeleteDirectory(backupFolder);
-            }
-            catch (Exception ex)
-            {
-                LauncherCommon.Log(ex, "清理安装备份目录失败");
-            }
-
-        DeleteFileQuietly(GetJarPath(folder, instanceName));
-        DeleteFileQuietly(Path.Combine(folder, ".pclignore"));
-        TryDeleteEmptyFolder(folder);
-        InvalidateInstanceCache(folder);
-        LauncherCommon.Log($"[Install] 已清理未完成的实例目录：{folder}", LauncherLogLevel.Developer);
-        return true;
+        return !File.Exists(GetJsonPath(folder, instanceName))
+            && !Directory.Exists(Path.Combine(folder, BackupFolderName));
     }
 
     private static void RestoreOrCleanup(string instanceFolder)
@@ -157,43 +131,39 @@ public static class McInstallRecovery
         if (string.IsNullOrEmpty(folder))
             return;
 
-        // 安装前已存在的核心文件备份：优先还原，绝不删除用户已有实例
+        InstallSession? session;
+        lock (SyncRoot)
+            Sessions.TryGetValue(folder, out session);
+        // 没有会话就无法证明路径归本次安装所有。
+        if (session is null) return;
+
+        var instanceName = session.InstanceName;
         var backupFolder = Path.Combine(folder, BackupFolderName);
-        if (Directory.Exists(backupFolder))
+        if (session.BackupPrepared)
             try
             {
-                LauncherCommon.CopyDirectory(backupFolder, folder);
-                DeleteFileQuietly(Path.Combine(folder, ".pclignore"));
-                LauncherCommon.DeleteDirectory(backupFolder);
-                InvalidateInstanceCache(folder);
+                if (session.JsonExisted)
+                    File.Copy(Path.Combine(backupFolder, $"{instanceName}.json"), GetJsonPath(folder, instanceName), true);
+                if (session.JarExisted)
+                    File.Copy(Path.Combine(backupFolder, $"{instanceName}.jar"), GetJarPath(folder, instanceName), true);
                 LauncherCommon.Log($"[Install] 已从备份还原实例目录：{folder}");
-                return;
             }
             catch (Exception ex)
             {
                 LauncherCommon.Log(ex, "还原实例备份失败");
+                return;
             }
-
-        InstallSession? session;
-        lock (SyncRoot)
-        {
-            Sessions.TryGetValue(folder, out session);
-        }
-
-        var instanceName = session?.InstanceName ?? Path.GetFileName(folder);
         LauncherCommon.Log(
             $"[Install] 由于安装失败或取消，清理本次安装创建的路径：{folder}",
             LauncherLogLevel.Developer);
 
         DeleteFileQuietly(Path.Combine(folder, ".pclignore"));
-        DeleteFileQuietly(GetJsonPath(folder, instanceName));
-        DeleteFileQuietly(GetJarPath(folder, instanceName));
+        if (!session.JsonExisted) DeleteFileQuietly(GetJsonPath(folder, instanceName));
+        if (!session.JarExisted) DeleteFileQuietly(GetJarPath(folder, instanceName));
+        if (session.BackupPrepared) DeleteBackupQuietly(folder);
 
-        var folderExistedBefore = session?.FolderExisted ?? false;
-        if (!folderExistedBefore)
+        if (!session.FolderExisted)
             DeleteFolderQuietly(folder);
-        else
-            TryDeleteEmptyFolder(folder);
 
         InvalidateInstanceCache(folder);
         UnregisterSession(folder);
@@ -257,24 +227,12 @@ public static class McInstallRecovery
         }
     }
 
-    private static void TryDeleteEmptyFolder(string folder)
-    {
-        try
-        {
-            if (Directory.Exists(folder) && !Directory.EnumerateFileSystemEntries(folder).Any())
-                Directory.Delete(folder);
-        }
-        catch (Exception ex)
-        {
-            LauncherCommon.Log(ex, $"删除空实例目录失败：{folder}");
-        }
-    }
-
     private sealed class InstallSession
     {
+        public bool BackupPrepared;
+
         public bool FolderExisted;
 
-        public required string InstanceFolder;
         public required string InstanceName;
 
         /// <summary>安装开始前实例核心 Jar 是否已存在（需要备份）。</summary>

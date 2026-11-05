@@ -304,6 +304,7 @@ public class PageInstanceInstall : MyPageRight, IRefreshable
     {
         return loader =>
         {
+            McInstallRecovery.HandleTerminalState(loader.State, instance.PathInstance);
             switch (loader.State)
             {
                 case LoadState.Finished:
@@ -346,41 +347,6 @@ public class PageInstanceInstall : MyPageRight, IRefreshable
         PageRouter.Navigate(PageType.Download, PageSubType.DownloadInstall);
     }
 
-    private static McInstallRequest BuildInstallRequest(McInstance instance)
-    {
-        var info = instance.Info;
-        return new McInstallRequest
-        {
-            targetInstanceName = instance.Name,
-            targetInstanceFolder = instance.PathInstance,
-            minecraftName = info.VanillaName,
-            optiFineEntry = info.HasOptiFine
-                ? new GameDownload.DlOptiFineListEntry
-                {
-                    Inherit = info.VanillaName,
-                    DisplayName = $"{info.VanillaName} {info.OptiFine}"
-                }
-                : null,
-            forgeEntry = info.HasForge
-                ? new GameDownload.DlForgeVersionEntry(info.Forge!, null, info.VanillaName)
-                {
-                    Category = "installer"
-                }
-                : null,
-            forgeVersion = info.HasForge ? info.Forge : null,
-            neoForgeVersion = info.HasNeoForge ? info.NeoForge : null,
-            cleanroomVersion = info.HasCleanroom ? info.Cleanroom : null,
-            fabricVersion = info.HasFabric ? info.Fabric : null,
-            liteLoaderEntry = info.HasLiteLoader
-                ? new GameDownload.DlLiteLoaderListEntry
-                {
-                    Inherit = info.VanillaName
-                }
-                : null,
-            legacyFabricVersion = info.HasLegacyFabric ? info.LegacyFabric : null
-        };
-    }
-
     private async Task ModifyAsync()
     {
         if (_instance is null)
@@ -391,15 +357,7 @@ public class PageInstanceInstall : MyPageRight, IRefreshable
         try
         {
             var instance = _instance;
-            var request = BuildInstallRequest(instance);
-            var unsupportedLoader = McInstallPipeline.GetUnsupportedLoaderName(request);
-            if (unsupportedLoader is not null)
-            {
-                HintService.Show(
-                    Hints.Warning(
-                        Lang.Text("Download.Install.Loader.Unsupported", unsupportedLoader)));
-                return;
-            }
+            var request = McInstallPipeline.CreateReinstallRequest(instance);
 
             var loaders = McInstallPipeline.CreateInstallLoader(request, true);
             if (loaders.Count == 0)
@@ -418,6 +376,10 @@ public class PageInstanceInstall : MyPageRight, IRefreshable
             Loading.LoaderTaskbarAdd(combo);
             LoadingUi.Current?.RefreshDownloadButton();
             PageRouter.Navigate(PageType.Launch);
+        }
+        catch (NotSupportedException ex)
+        {
+            HintService.Show(Hints.Warning(ex.Message));
         }
         catch (Exception ex)
         {
@@ -515,6 +477,7 @@ public class PageInstanceInstall : MyPageRight, IRefreshable
         try
         {
             var instance = _instance;
+            var request = McInstallPipeline.CreateReinstallRequest(instance);
             var dialog = await DialogService.Instance.ShowAsync(
                 new TextDialogRequest
                 {
@@ -525,33 +488,6 @@ public class PageInstanceInstall : MyPageRight, IRefreshable
                 });
             if (!dialog.IsConfirmed)
                 return;
-
-            // 备份实例核心文件，便于安装失败后还原
-            try
-            {
-                var backupFolder = Path.Combine(instance.PathInstance, "PCLInstallBackups");
-                InstancePageHelper.EnsureDirectory(backupFolder);
-                var json = Path.Combine(instance.PathInstance, $"{instance.Name}.json");
-                var jar = Path.Combine(instance.PathInstance, $"{instance.Name}.jar");
-                if (File.Exists(json))
-                    File.Copy(json, Path.Combine(backupFolder, $"{instance.Name}.json"), true);
-                if (File.Exists(jar))
-                    File.Copy(jar, Path.Combine(backupFolder, $"{instance.Name}.jar"), true);
-            }
-            catch (Exception ex)
-            {
-                LauncherCommon.Log(ex, "备份实例核心文件失败", LauncherLogLevel.Developer);
-            }
-
-            var request = BuildInstallRequest(instance);
-            var unsupportedLoader = McInstallPipeline.GetUnsupportedLoaderName(request);
-            if (unsupportedLoader is not null)
-            {
-                HintService.Show(
-                    Hints.Warning(
-                        Lang.Text("Download.Install.Loader.Unsupported", unsupportedLoader)));
-                return;
-            }
 
             var loaders = McInstallPipeline.CreateInstallLoader(request, true);
             if (loaders.Count == 0)
@@ -570,6 +506,10 @@ public class PageInstanceInstall : MyPageRight, IRefreshable
             Loading.LoaderTaskbarAdd(combo);
             LoadingUi.Current?.RefreshDownloadButton();
             PageRouter.Navigate(PageType.Launch);
+        }
+        catch (NotSupportedException ex)
+        {
+            HintService.Show(Hints.Warning(ex.Message));
         }
         catch (Exception ex)
         {

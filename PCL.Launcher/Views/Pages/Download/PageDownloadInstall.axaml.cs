@@ -798,9 +798,7 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
 
         var instanceFolder =
             Path.Combine(folder, "versions", name) + Path.DirectorySeparatorChar;
-        var instanceJsonPath = Path.Combine(instanceFolder, $"{name}.json");
-        if (File.Exists(instanceJsonPath)
-            || !McInstallRecovery.TryClearIncompleteInstanceFolder(instanceFolder, name))
+        if (!McInstallRecovery.CanInstallToFolder(instanceFolder, name))
         {
             HintService.Show(
                 Hints.Error(
@@ -883,7 +881,7 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
         }
 
         // 失败或取消时回滚本次安装创建的路径；成功时清理备份
-        McInstallRecovery.HandleTerminalState(loader, _instanceFolder);
+        McInstallRecovery.HandleTerminalState(loader.State, _instanceFolder);
         if (_installCombo is not null)
         {
             _installCombo.OnStateChangedUi -= OnInstallStateChanged;

@@ -4,18 +4,18 @@ namespace PCL.Core.UI;
 
 /// <summary>
 ///     把 Avalonia 的异步 API 适配成 <see cref="PCL.Core.Platform" /> 中的同步契约。
-///     UI 线程上会边等待边执行已排队的调度任务，避免同步等待造成的死锁。
+///     UI 线程上使用嵌套消息循环，保持原生输入与异步回调可用。
 /// </summary>
 internal static class SyncHelper
 {
-    /// <summary>同步等待任务完成并返回结果；UI 线程上会持续驱动调度队列。</summary>
+    /// <summary>同步等待任务完成并返回结果。</summary>
     public static T? Wait<T>(Task<T> task)
     {
         WaitCore(task);
         return task.GetAwaiter().GetResult();
     }
 
-    /// <summary>同步等待任务完成；UI 线程上会持续驱动调度队列。</summary>
+    /// <summary>同步等待任务完成。</summary>
     public static void Wait(Task task)
     {
         WaitCore(task);
@@ -31,10 +31,12 @@ internal static class SyncHelper
             return;
         }
 
-        while (!task.IsCompleted)
-        {
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
-            Thread.Sleep(1);
-        }
+        var frame = new ModalFrame();
+        _ = task.ContinueWith(
+            _ => frame.Exit(),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+        frame.Run();
     }
 }

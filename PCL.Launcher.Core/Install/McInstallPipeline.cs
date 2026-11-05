@@ -34,6 +34,54 @@ public static class McInstallPipeline
         return null;
     }
 
+    /// <summary>保留现有加载器构造重装请求；无法重装时在任何文件操作前拒绝。</summary>
+    public static McInstallRequest CreateReinstallRequest(McInstance instance)
+    {
+        var info = instance.Info;
+        if (info.HasLabyMod)
+            throw new NotSupportedException(
+                Lang.Text("Download.Install.Loader.Unsupported", Lang.Text("Common.Installation.LabyMod")));
+        if (info.HasQuilt)
+            throw new NotSupportedException(Lang.Text("Instance.Overall.Reset.QuiltUnsupported"));
+        if (info.Drop != 99 && info.HasForge
+            && McVersionComparer.CompareVersion(info.VanillaName, "1.5.2") == -1)
+            throw new NotSupportedException(Lang.Text("Instance.Overall.Reset.NotSupported"));
+
+        var request = new McInstallRequest
+        {
+            targetInstanceName = instance.Name,
+            targetInstanceFolder = instance.PathInstance,
+            minecraftName = info.VanillaName,
+            optiFineEntry = info.HasOptiFine
+                ? new GameDownload.DlOptiFineListEntry
+                {
+                    Inherit = info.VanillaName,
+                    DisplayName = $"{info.VanillaName} {info.OptiFine}"
+                }
+                : null,
+            forgeEntry = info.HasForge
+                ? new GameDownload.DlForgeVersionEntry(info.Forge!, null, info.VanillaName)
+                {
+                    Category = "installer"
+                }
+                : null,
+            forgeVersion = info.HasForge ? info.Forge : null,
+            neoForgeVersion = info.HasNeoForge ? info.NeoForge : null,
+            cleanroomVersion = info.HasCleanroom ? info.Cleanroom : null,
+            fabricVersion = info.HasFabric ? info.Fabric : null,
+            liteLoaderEntry = info.HasLiteLoader
+                ? new GameDownload.DlLiteLoaderListEntry
+                {
+                    Inherit = info.VanillaName
+                }
+                : null,
+            legacyFabricVersion = info.HasLegacyFabric ? info.LegacyFabric : null
+        };
+        if (GetUnsupportedLoaderName(request) is { } unsupported)
+            throw new NotSupportedException(Lang.Text("Download.Install.Loader.Unsupported", unsupported));
+        return request;
+    }
+
     public static bool IsSupported(McInstallRequest request)
     {
         return GetUnsupportedLoaderName(request) is null;
@@ -68,62 +116,66 @@ public static class McInstallPipeline
                 Lang.Text("Download.Install.Loader.Unsupported", unsupportedLoader));
 
         var instanceJsonPath = McInstallRecovery.GetJsonPath(instanceFolder, instanceName);
-        McInstallRecovery.RegisterSession(instanceFolder, instanceName);
         if (File.Exists(instanceJsonPath) && !ignoreDump)
         {
-            McInstallRecovery.UnregisterSession(instanceFolder);
             HintService.Show(
                 Hints.Error(
                     Lang.Text("Minecraft.Download.Error.InstanceAlreadyExists", instanceName, "")));
             throw new CancelledException();
         }
 
-        if (!File.Exists(instanceJsonPath))
-            McInstallRecovery.TryClearIncompleteInstanceFolder(instanceFolder, instanceName);
-        McInstallRecovery.PrepareBackup(instanceFolder, instanceName);
-
-        var tempFolder = LauncherCommon.GetTempFolder("Install");
-        var loaders = new List<Loading.LoaderBase>
+        McInstallRecovery.RegisterSession(instanceFolder, instanceName);
+        try
         {
-            CreateIgnoreFlagLoader(instanceFolder)
-        };
+            var tempFolder = LauncherCommon.GetTempFolder("Install");
+            var loaders = new List<Loading.LoaderBase>
+            {
+                CreateIgnoreFlagLoader(instanceFolder)
+            };
 
-        AddVanillaLoaders(loaders, request, instanceFolder, instanceName, minecraftName);
-        var hasLoader = request.fabricVersion is not null
-            || request.legacyFabricVersion is not null
-            || IsForgelikeRequested(request);
-        if (!hasLoader)
+            AddVanillaLoaders(loaders, request, instanceFolder, instanceName, minecraftName);
+            var hasLoader = request.fabricVersion is not null
+                || request.legacyFabricVersion is not null
+                || IsForgelikeRequested(request);
+            if (!hasLoader)
+                loaders.Add(
+                    new Loading.LoaderTask<int, int>(
+                        Lang.Text("Minecraft.Download.Stage.InstallGame"),
+                        _ => InstanceJsonMerge.Normalize(instanceFolder, instanceName))
+                    {
+                        ProgressWeight = 1d
+                    });
+            AddLoaderSpecificLoaders(
+                loaders,
+                request,
+                instanceFolder,
+                instanceName,
+                minecraftName,
+                tempFolder);
+            AddForgelikeLoaders(
+                loaders,
+                request,
+                instanceFolder,
+                instanceName,
+                minecraftName,
+                tempFolder);
+            AddApiModLoaders(loaders, request, instanceFolder, minecraftName);
+
             loaders.Add(
                 new Loading.LoaderTask<int, int>(
-                    Lang.Text("Minecraft.Download.Stage.InstallGame"),
-                    _ => InstanceJsonMerge.Normalize(instanceFolder, instanceName))
+                    Lang.Text("Minecraft.Download.Stage.DeleteIgnoreFlag"),
+                    _ => DeleteIgnoreFlag(instanceFolder))
                 {
-                    ProgressWeight = 1d
+                    ProgressWeight = 0.5d
                 });
-        AddLoaderSpecificLoaders(
-            loaders,
-            request,
-            instanceFolder,
-            instanceName,
-            minecraftName,
-            tempFolder);
-        AddForgelikeLoaders(
-            loaders,
-            request,
-            instanceFolder,
-            instanceName,
-            minecraftName,
-            tempFolder);
-        AddApiModLoaders(loaders, request, instanceFolder, minecraftName);
-
-        loaders.Add(
-            new Loading.LoaderTask<int, int>(
-                Lang.Text("Minecraft.Download.Stage.DeleteIgnoreFlag"),
-                _ => DeleteIgnoreFlag(instanceFolder))
-            {
-                ProgressWeight = 0.5d
-            });
-        return loaders;
+            McInstallRecovery.PrepareBackup(instanceFolder, instanceName);
+            return loaders;
+        }
+        catch
+        {
+            McInstallRecovery.UnregisterSession(instanceFolder);
+            throw;
+        }
     }
 
     private static void AddVanillaLoaders(

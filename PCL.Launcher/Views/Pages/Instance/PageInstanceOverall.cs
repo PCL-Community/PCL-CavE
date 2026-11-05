@@ -1115,20 +1115,7 @@ public class PageInstanceOverall : MyPageRight
         try
         {
             var instance = _instance;
-            var currentVersion = instance.Info;
-            if (currentVersion.Drop != 99
-                && McVersionComparer.CompareVersion(currentVersion.VanillaName, "1.5.2") == -1
-                && currentVersion.HasForge)
-            {
-                HintService.Show(Hints.Info(Lang.Text("Instance.Overall.Reset.NotSupported")));
-                return;
-            }
-
-            if (currentVersion.HasQuilt)
-            {
-                HintService.Show(Hints.Info(Lang.Text("Instance.Overall.Reset.QuiltUnsupported")));
-                return;
-            }
+            var request = McInstallPipeline.CreateReinstallRequest(instance);
 
             var dialog = await DialogService.Instance.ShowAsync(
                 new TextDialogRequest
@@ -1140,67 +1127,6 @@ public class PageInstanceOverall : MyPageRight
                 });
             if (!dialog.IsConfirmed)
                 return;
-
-            // 备份实例核心文件，便于安装失败后还原
-            try
-            {
-                var backupFolder = Path.Combine(instance.PathInstance, "PCLInstallBackups");
-                InstancePageHelper.EnsureDirectory(backupFolder);
-                var json = Path.Combine(instance.PathInstance, $"{instance.Name}.json");
-                var jar = Path.Combine(instance.PathInstance, $"{instance.Name}.jar");
-                if (File.Exists(json))
-                    File.Copy(json, Path.Combine(backupFolder, $"{instance.Name}.json"), true);
-                if (File.Exists(jar))
-                    File.Copy(jar, Path.Combine(backupFolder, $"{instance.Name}.jar"), true);
-            }
-            catch (Exception ex)
-            {
-                LauncherCommon.Log(ex, "备份实例核心文件失败", LauncherLogLevel.Developer);
-            }
-
-            var request = new McInstallRequest
-            {
-                targetInstanceName = instance.Name,
-                targetInstanceFolder = instance.PathInstance,
-                minecraftName = currentVersion.VanillaName,
-                optiFineEntry = currentVersion.HasOptiFine
-                    ? new GameDownload.DlOptiFineListEntry
-                    {
-                        Inherit = currentVersion.VanillaName,
-                        DisplayName = $"{currentVersion.VanillaName} {currentVersion.OptiFine}"
-                    }
-                    : null,
-                forgeEntry = currentVersion.HasForge
-                    ? new GameDownload.DlForgeVersionEntry(
-                        currentVersion.Forge,
-                        null,
-                        currentVersion.VanillaName)
-                    {
-                        Category = "installer"
-                    }
-                    : null,
-                forgeVersion = currentVersion.HasForge ? currentVersion.Forge : null,
-                neoForgeVersion = currentVersion.HasNeoForge ? currentVersion.NeoForge : null,
-                cleanroomVersion = currentVersion.HasCleanroom ? currentVersion.Cleanroom : null,
-                fabricVersion = currentVersion.HasFabric ? currentVersion.Fabric : null,
-                liteLoaderEntry = currentVersion.HasLiteLoader
-                    ? new GameDownload.DlLiteLoaderListEntry
-                    {
-                        Inherit = currentVersion.VanillaName
-                    }
-                    : null,
-                legacyFabricVersion =
-                    currentVersion.HasLegacyFabric ? currentVersion.LegacyFabric : null
-            };
-
-            var unsupportedLoader = McInstallPipeline.GetUnsupportedLoaderName(request);
-            if (unsupportedLoader is not null)
-            {
-                HintService.Show(
-                    Hints.Warning(
-                        Lang.Text("Download.Install.Loader.Unsupported", unsupportedLoader)));
-                return;
-            }
 
             var loaders = McInstallPipeline.CreateInstallLoader(request, true);
             if (loaders.Count == 0)
@@ -1220,6 +1146,10 @@ public class PageInstanceOverall : MyPageRight
         }
         catch (CancelledException)
         {
+        }
+        catch (NotSupportedException ex)
+        {
+            HintService.Show(Hints.Warning(ex.Message));
         }
         catch (Exception ex)
         {
@@ -1402,6 +1332,7 @@ public class PageInstanceOverall : MyPageRight
     {
         return loader =>
         {
+            McInstallRecovery.HandleTerminalState(loader.State, instance.PathInstance);
             switch (loader.State)
             {
                 case LoadState.Finished:
