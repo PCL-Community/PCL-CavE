@@ -4,26 +4,20 @@ using PCL.Core.Platform;
 namespace PCL.Core.UI;
 
 /// <summary>
-///     基于 Avalonia 调度队列的模态消息泵。
-///     Avalonia 没有 WPF 的 <c>DispatcherFrame</c>，这里用 <see cref="Dispatcher.RunJobs" /> 驱动排队任务；
-///     原生输入仍由主消息循环处理，待弹窗迁移到 Avalonia 后改为异步语义。
+///     使用 Avalonia 的嵌套消息循环，在同步等待期间继续处理原生输入。
 /// </summary>
 internal sealed class ModalFrame : IUiModalFrame
 {
-    private volatile bool _exited;
+    private readonly DispatcherFrame _frame = new();
 
     public void Exit()
     {
-        _exited = true;
+        _frame.Continue = false;
     }
 
     public void Run()
     {
-        while (!_exited)
-        {
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
-            Thread.Sleep(1);
-        }
+        Dispatcher.UIThread.PushFrame(_frame);
     }
 }
 

@@ -13,7 +13,6 @@ on:
       - '**/*.md'
       - '**/LICENSE'
       - '**/LICENCE'
-      - 'PCL.Core.Test/**'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/FUNDING.yml'
   pull_request:
@@ -24,15 +23,25 @@ jobs:
   build:
     strategy:
       matrix:
-        include:
-          - configuration: CI
-            architecture: x64
-          - configuration: CI
-            architecture: ARM64
+        runtime: [win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64]
       fail-fast: false
 
     uses: ./.github/workflows/reusable-build.yml
     with:
-      configuration: ${{ matrix.configuration }}
-      architecture: ${{ matrix.architecture }}
+      configuration: CI
+      runtime: ${{ matrix.runtime }}
     secrets: inherit
+
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: 10.0.x
+      - name: Test migration regressions
+        run: dotnet test PCL.Core.Test/PCL.Core.Test.csproj -c Debug --filter TestCategory=Migration

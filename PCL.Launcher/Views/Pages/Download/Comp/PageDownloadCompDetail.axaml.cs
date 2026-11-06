@@ -516,19 +516,7 @@ public partial class PageDownloadCompDetail : MyPageRight
                 return;
 
             var instanceFolder = Path.Combine(versionsFolder, instanceName);
-            if (File.Exists(Path.Combine(instanceFolder, $"{instanceName}.json")))
-            {
-                HintService.Show(
-                    Hints.Error(
-                        Lang.Text(
-                            "Minecraft.Download.Error.InstanceAlreadyExists",
-                            instanceName,
-                            "")));
-                return;
-            }
-
-            // 上次失败留下的半成品目录：先按安装恢复服务清理可重试
-            if (!McInstallRecovery.TryClearIncompleteInstanceFolder(instanceFolder, instanceName))
+            if (!McInstallRecovery.CanInstallToFolder(instanceFolder, instanceName))
             {
                 HintService.Show(
                     Hints.Error(
