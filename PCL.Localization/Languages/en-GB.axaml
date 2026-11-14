@@ -2927,9 +2927,9 @@
 
     <sys:String x:Key="Setup.Misc.Debug.AnimationSpeed">Animation speed</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol">Linux display protocol</sys:String>
-    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto">Auto (X11)</sys:String>
+    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto">Auto ({0})</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.ToolTip">Select the display protocol used on Linux. A restart is required.&#xA;This setting will be overrided if PCL_FORCE_X11 and PCL_USE_WAYLAND environment variables are used.</sys:String>
-    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip">Follow the launcher default (X11).</sys:String>
+    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip">Follow the launcher default ({0}).</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.X11.ToolTip">Use X11/XWayland. This is currently the most stable option for compatibility and frame pacing.</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Wayland.ToolTip">Use native Wayland. Experimental and animation stutter or window behaviour differences may occur.</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Restart">Display protocol saved. Restart the launcher to apply it.</sys:String>

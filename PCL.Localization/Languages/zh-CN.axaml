@@ -2994,9 +2994,9 @@
 
     <sys:String x:Key="Setup.Misc.Debug.AnimationSpeed">动画速度</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol">Linux 显示协议</sys:String>
-    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto">自动（X11）</sys:String>
+    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto">自动（{0}）</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.ToolTip">选择 Linux 下使用的显示协议，修改后需要重启启动器。&#xA;使用环境变量 PCL_FORCE_X11 或 PCL_USE_WAYLAND 将会覆盖此设置。</sys:String>
-    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip">跟随启动器默认值（X11）。</sys:String>
+    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip">跟随启动器默认值（{0}）。</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.X11.ToolTip">使用 X11/XWayland 显示。当前兼容性和帧率最稳定，推荐保持。</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Wayland.ToolTip">使用原生 Wayland 显示。实验性，可能出现动画卡顿或窗口行为差异。</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Restart">显示协议已保存，需要重启启动器后生效。</sys:String>

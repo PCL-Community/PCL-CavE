@@ -17,7 +17,7 @@
         <NoWarn>$(NoWarn);CS9113</NoWarn>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="12.1.4" />
+        <PackageReference Include="Avalonia" Version="12.1.6" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\PCL.Core\PCL.Core.csproj" />

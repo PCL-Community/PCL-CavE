@@ -184,7 +184,8 @@
                                        Grid.Column="1"
                                        HorizontalAlignment="Stretch"
                                        ToolTip.Tip="{loc:Loc Setup.Misc.Debug.LinuxProtocol.ToolTip}">
-                            <ui:MyComboBoxItem Content="{loc:Loc Setup.Misc.Debug.LinuxProtocol.Auto}"
+                            <ui:MyComboBoxItem x:Name="ComboDebugLinuxProtocolAuto"
+                                               Content="{loc:Loc Setup.Misc.Debug.LinuxProtocol.Auto}"
                                                Tag="0"
                                                ToolTip.Tip="{loc:Loc Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip}" />
                             <ui:MyComboBoxItem Content="X11"

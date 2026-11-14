@@ -22,12 +22,13 @@ namespace PCL.Core.UI.Animation.Core;
 [LifecycleService(LifecycleState.WindowCreating)]
 public sealed class AnimationService : GeneralService
 {
-    private static readonly List<(IAnimation Animation, IAnimatable Target)> ActiveAnimations = new(8);
+    private static readonly List<(IAnimation Animation, IAnimatable Target)> ActiveAnimations =
+        [with(8)];
+
     private static readonly ConcurrentDictionary<string, IAnimation> NamedAnimations = new();
     private static AvaloniaRenderingClock? _clock;
     private static int _inTick;
     private static IUiAccessProvider? _uiAccessProvider;
-
     private static readonly Lock InitLock = new();
     private static bool _initialized;
     private static double? _speedOverride;
@@ -35,6 +36,13 @@ public sealed class AnimationService : GeneralService
 
     /// <summary>手动逐帧驱动使用的采样率。运行中的 UI 动画按显示器刷新率采样，不受此值限速。</summary>
     public static int Fps { get; set; } = 60;
+
+    /// <summary>
+    ///     是否优先使用固定定时器而不是 RequestAnimationFrame 驱动动画。
+    ///     原生 Wayland 后端在持续动画期间会让 RAF 以远高于刷新率的频率回调，
+    ///     由平台层在确定使用原生 Wayland 时置为 true，避免 UI 线程从第一帧开始自旋。
+    /// </summary>
+    public static bool PreferTimerClock { get; set; }
 
     public static double Speed
     {
@@ -52,6 +60,11 @@ public sealed class AnimationService : GeneralService
 
     public static IUiAccessProvider UiAccessProvider =>
         _uiAccessProvider ??= new AvaloniaUiAccessProvider();
+
+    public static void ResetVisibleDiagnostics()
+    {
+        UiFramePump.ResetVisibleDiagnostics();
+    }
 
     public static double MapSpeedValue(int value)
     {

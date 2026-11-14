@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using PCL.Core.Logging;
 using PCL.Core.Utils;
 
 namespace PCL.Core.UI.Animation.Clock;
@@ -13,8 +12,6 @@ namespace PCL.Core.UI.Animation.Clock;
 /// <param name="fps">帧率；<see cref="int.MaxValue" /> 表示每个渲染帧都触发。</param>
 public class AvaloniaRenderingClock(int fps = 60) : IUiClock, IDisposable
 {
-    private const string Module = "Animation";
-
     private bool _disposed;
     private long _lastFrame;
     private TimeSpan _lastTime = TimeSpan.Zero;
@@ -45,11 +42,6 @@ public class AvaloniaRenderingClock(int fps = 60) : IUiClock, IDisposable
         _lastTime = TimeSpan.Zero;
         _timerStartStamp = 0;
         UiFramePump.Subscribe(this);
-#if DEBUG
-        LogWrapper.Debug(
-            Module,
-            $"[Animation] 时钟已启动 fps={(Fps == int.MaxValue ? "每帧" : Fps.ToString())}");
-#endif
     }
 
     public void Stop()

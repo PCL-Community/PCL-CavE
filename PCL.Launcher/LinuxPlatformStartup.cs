@@ -2,6 +2,7 @@ using System.Text.Json;
 using Avalonia;
 using Avalonia.Rendering.Composition;
 using PCL.Core.App;
+using PCL.Core.Platform;
 using PCL.UI.SystemIntegration;
 
 namespace PCL;
@@ -26,6 +27,9 @@ internal sealed class LinuxPlatformStartup : IPlatformStartup
             return builder;
 
         LinuxDesktopEntry.Ensure();
+        // 原生 Wayland 的合成器会让持续动画期间的 RAF 回调远高于刷新率，
+        // 直接使用固定 60Hz 定时器，避免 UI 线程在启动动画阶段自旋。
+        AnimationService.PreferTimerClock = true;
         builder = builder
             .With(
                 new WaylandPlatformOptions
@@ -46,7 +50,9 @@ internal sealed class LinuxPlatformStartup : IPlatformStartup
     {
         if (Environment.GetEnvironmentVariable("PCL_FORCE_X11") is not null) return false;
         if (Environment.GetEnvironmentVariable("PCL_USE_WAYLAND") == "1") return true;
-        return ReadProtocolFromConfig() == 2;
+
+        return LinuxDisplayProtocolResolver.ResolveEffective(ReadProtocolFromConfig())
+            == LinuxDisplayProtocol.Wayland;
     }
 
     private static int ReadProtocolFromConfig()

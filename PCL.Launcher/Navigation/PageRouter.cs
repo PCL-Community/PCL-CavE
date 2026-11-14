@@ -46,6 +46,9 @@ public static class PageRouter
     /// <summary>页面宿主已经完成 110ms 换页；左栏背景按实际内容宽度重新测量。</summary>
     public static event Action? PageHostSwapped;
 
+    /// <summary>页面进入回调已完成，随后安排一次布局。</summary>
+    public static event Action? PageEntered;
+
     public static void Attach(ContentControl? leftHost, ContentControl rightHost)
     {
         _leftHost = leftHost;
@@ -328,6 +331,10 @@ public static class PageRouter
         catch (Exception ex)
         {
             LogWrapper.Error(ex, "UI", $"页面进入失败：{stack.Page}");
+        }
+        finally
+        {
+            PageEntered?.Invoke();
         }
     }
 

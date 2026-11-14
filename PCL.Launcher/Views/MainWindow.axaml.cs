@@ -25,6 +25,14 @@ public partial class MainWindow : Window
 {
     private const string LeftWidthAnimationKey = "MainWindow LeftChange";
 
+    private static readonly PageType[] MainPages =
+    [
+        PageType.Launch,
+        PageType.Download,
+        PageType.Setup,
+        PageType.Tools
+    ];
+
     private readonly BackgroundLayer _background;
     private readonly ExtraButtonsPanel _extraButtons;
     private readonly TitleBar _titleBar;
@@ -48,6 +56,7 @@ public partial class MainWindow : Window
         _ = new ExitFlow(this);
 
         PageRouter.Attach(PageLeftHost, PageRightHost);
+        PreloadLaunchPage();
         PageRouter.Navigated += OnNavigated;
         PageRouter.PageHostSwapped += OnPageHostSwapped;
         PageRouter.PageChanged += _ => _extraButtons.RefreshAllStates();
@@ -90,7 +99,7 @@ public partial class MainWindow : Window
         PageRouter.ShowStandalone(new PageLoading());
         Lifecycle.When(
             LifecycleState.Running,
-            () => { PageRouter.Navigate(MainTab.Launch); });
+            () => Dispatcher.UIThread.Post(WarmupAndNavigate));
 
         var effects = new StartupEffects(this, _titleBar, _background, _extraButtons);
         Lifecycle.When(LifecycleState.WindowCreated, effects.Run);
@@ -110,6 +119,109 @@ public partial class MainWindow : Window
     }
 
     public static MainWindow? Current { get; private set; }
+
+    /// <summary>
+    ///     在启动画面仍显示时预创建启动页，避免主窗口出现后再同步实例化首屏页面。
+    /// </summary>
+    private void PreloadLaunchPage()
+    {
+        try
+        {
+            if (PageRegistry.GetHost(PageType.Launch) is not { } host) return;
+            var stack = new PageStackData(PageType.Launch);
+            _ = host.GetLeft(stack);
+            _ = host.GetRight(stack);
+        }
+        catch (Exception ex)
+        {
+            LogWrapper.Debug("UI", $"启动页预加载失败：{ex.Message}");
+        }
+    }
+
+    /// <summary>
+    ///     启动画面仍显示时，把主标签页依次挂到右栏跑一次真实布局再卸载。
+    ///     页面第二次挂载时布局通常只需几十毫秒，用户首次切换标签页不会再看到长帧。
+    /// </summary>
+    private async Task WarmupMainPagesAsync()
+    {
+        foreach (var page in MainPages)
+        {
+            if (page == PageType.Launch) continue;
+            if (PageRegistry.GetHost(page) is not { } host) continue;
+
+            try
+            {
+                var stack = new PageStackData(page);
+                _ = host.GetLeft(stack);
+                var right = host.GetRight(stack);
+                PageRightHost.Content = right;
+                await WaitForLayoutAsync(right);
+                await Dispatcher.UIThread.InvokeAsync(
+                    static () => { },
+                    DispatcherPriority.Loaded);
+                PageRightHost.Content = null;
+            }
+            catch (Exception ex)
+            {
+                LogWrapper.Debug("UI", $"预热 {page} 失败：{ex.Message}");
+            }
+        }
+    }
+
+    private static Task WaitForLayoutAsync(Control control)
+    {
+        var completion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void OnLayout(object? sender, EventArgs e)
+        {
+            control.LayoutUpdated -= OnLayout;
+            completion.TrySetResult();
+        }
+
+        control.LayoutUpdated += OnLayout;
+        return Task.WhenAny(completion.Task, Task.Delay(2000));
+    }
+
+    private async void WarmupAndNavigate()
+    {
+        try
+        {
+            if (App.IsStartupSplashVisible)
+                await WarmupMainPagesAsync();
+            PageRouter.ShowStandalone(new PageLoading());
+
+            var entered = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            void OnPageEntered()
+            {
+                PageRouter.PageEntered -= OnPageEntered;
+                entered.TrySetResult();
+            }
+
+            PageRouter.PageEntered += OnPageEntered;
+            try
+            {
+                PageRouter.Navigate(MainTab.Launch);
+                await Task.WhenAny(entered.Task, Task.Delay(3000));
+                await Dispatcher.UIThread.InvokeAsync(
+                    static () => { },
+                    DispatcherPriority.Loaded);
+            }
+            finally
+            {
+                PageRouter.PageEntered -= OnPageEntered;
+            }
+
+            App.CloseStartupSplash();
+        }
+        catch (Exception ex)
+        {
+            LogWrapper.Error(ex, "UI", "启动页预热或导航失败");
+            App.CloseStartupSplash();
+        }
+    }
 
     private void OnNavigated(PageNavigationState state)
     {

@@ -1,9 +1,8 @@
-using System.Diagnostics;
-using System.Text;
 using Avalonia.Controls;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Localization;
+using PCL.Core.Platform;
 using PCL.Core.UI;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
@@ -29,6 +28,7 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
 
         SliderMaxLog.getHintText = new Func<object, object>(FormatMaxLogHint);
         SliderDebugAnim.getHintText = new Func<object, object>(FormatAnimationSpeedHint);
+        RefreshLinuxProtocolAutoText();
 
         ComboSystemActivity.SelectionChanged += async (_, _) => await OnAnnouncementChangedAsync();
         SliderMaxLog.Change += (_, _) =>
@@ -36,7 +36,7 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
         SliderDebugAnim.Change += (_, _) =>
             WriteIfReady(() => Config.Debug.AnimationSpeed = SliderDebugAnim.Value);
 
-        var supportsProtocol = PCL.Core.Platform.PlatformRuntime.Current.Capabilities
+        var supportsProtocol = PlatformRuntime.Current.Capabilities
             .SupportsDisplayProtocolSelection;
         ComboDebugLinuxProtocol.IsEnabled = supportsProtocol;
         ToolTip.SetTip(
@@ -163,6 +163,7 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
             PanHttpProxyCustom.IsVisible = proxyType == 2;
 
             SliderDebugAnim.Value = Config.Debug.AnimationSpeed;
+            RefreshLinuxProtocolAutoText();
             ComboDebugLinuxProtocol.SelectedIndex =
                 Math.Clamp(Config.Debug.LinuxProtocol, 0, 2);
             CheckDebugSkipCopy.Checked = Config.Debug.DontCopy;
@@ -175,6 +176,17 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
         }
 
         RefreshTelemetryToolTip();
+    }
+
+    private void RefreshLinuxProtocolAutoText()
+    {
+        var resolved = LinuxDisplayProtocolResolver.ResolveAuto();
+        var name = resolved == LinuxDisplayProtocol.Wayland ? "Wayland" : "X11";
+        ComboDebugLinuxProtocolAuto.Content =
+            Lang.Text("Setup.Misc.Debug.LinuxProtocol.Auto", name);
+        ToolTip.SetTip(
+            ComboDebugLinuxProtocolAuto,
+            Lang.Text("Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip", name));
     }
 
     private void RefreshTelemetryToolTip()
@@ -387,7 +399,7 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
             .Distinct()
             .ToArray();
 
-        PCL.Core.Platform.PlatformRuntime.Current.ProcessCleanup.DeleteFoldersAndRestart(folders);
+        PlatformRuntime.Current.ProcessCleanup.DeleteFoldersAndRestart(folders);
 
         UiInteraction.Shutdown();
         return;

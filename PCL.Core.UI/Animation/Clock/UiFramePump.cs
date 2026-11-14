@@ -4,22 +4,24 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using PCL.Core.Logging;
+using PCL.Core.UI.Animation.Core;
 
 namespace PCL.Core.UI.Animation.Clock;
 
 /// <summary>
 ///     UI 动画共用的帧源：窗口可见时使用渲染帧，否则回退到 Render 优先级定时器。
 /// </summary>
-internal static class UiFramePump
+internal static partial class UiFramePump
 {
     private const string Module = "Animation";
     private const int FallbackFps = 60;
     private const int RetryIntervalMilliseconds = 250;
     private const int RafStallMilliseconds = 1000;
-#if DEBUG
-    private const int StatWindowMilliseconds = 5000;
-    private const double SlowFrameMilliseconds = 100d;
-#endif
+    private const int RapidRafThresholdMilliseconds = 4;
+    private const int RapidRafCountLimit = 30;
+
+    private static readonly bool ForceTimer =
+        Environment.GetEnvironmentVariable("PCL_ANIMATION_TIMER") == "1";
 
     private static readonly List<AvaloniaRenderingClock> Subscribers = [];
     private static readonly Lock SyncRoot = new();
@@ -30,17 +32,21 @@ internal static class UiFramePump
     private static bool _rafScheduled;
     private static int _rafToken;
     private static long _rafRequestStamp;
+    private static long _lastRafStamp;
+    private static int _rapidRafCount;
+    private static bool _timerPreferred;
     private static string _loggedMode = string.Empty;
-#if DEBUG
-    private static long _statStartStamp;
-    private static long _lastTickStamp;
-    private static int _statTicks;
-    private static int _statSlowTicks;
-    private static double _statMaxIntervalMs;
-    private static double _statMaxTickMs;
-#endif
+
+    private static bool UseTimer =>
+        ForceTimer || AnimationService.PreferTimerClock || _timerPreferred;
 
     public static bool IsRunning { get; private set; }
+
+    /// <summary>窗口正式可见时重置诊断窗口，避免把启动画面遮挡期间的布局算进首屏长帧。</summary>
+    internal static void ResetVisibleDiagnostics()
+    {
+        DiagResetVisible();
+    }
 
     public static void Subscribe(AvaloniaRenderingClock clock)
     {
@@ -82,14 +88,7 @@ internal static class UiFramePump
         }
 
         IsRunning = true;
-#if DEBUG
-        _statStartStamp = Stopwatch.GetTimestamp();
-        _statTicks = 0;
-        _statSlowTicks = 0;
-        _statMaxIntervalMs = 0d;
-        _statMaxTickMs = 0d;
-        _lastTickStamp = 0;
-#endif
+        DiagStart();
         _ResolveAndDrive();
     }
 
@@ -100,22 +99,32 @@ internal static class UiFramePump
         IsRunning = false;
         _rafToken++;
         _rafScheduled = false;
+        _lastRafStamp = 0;
+        _rapidRafCount = 0;
         _StopFrameTimer();
         _StopRetryTimer();
         _DetachTopLevel();
         _loggedMode = string.Empty;
-#if DEBUG
-        _lastTickStamp = 0;
-        _statSlowTicks = 0;
-        _statMaxIntervalMs = 0d;
-        _statMaxTickMs = 0d;
-        LogWrapper.Debug(Module, "[Animation] 帧源已停止 clock=stopped");
-#endif
+        DiagStop();
     }
 
     private static void _ResolveAndDrive()
     {
         if (!IsRunning) return;
+
+        if (UseTimer)
+        {
+            _StartFrameTimer();
+            _StartRetryTimer();
+            _LogMode(
+                "timer",
+                ForceTimer
+                    ? "PCL_ANIMATION_TIMER=1"
+                    : AnimationService.PreferTimerClock
+                        ? "原生 Wayland 固定帧率"
+                        : "RAF 曾经过密");
+            return;
+        }
 
         var topLevel = _ResolveTopLevel();
         if (topLevel is not null)
@@ -168,18 +177,12 @@ internal static class UiFramePump
     private static void _OnTopLevelOpened(object? sender, EventArgs e)
     {
         if (!IsRunning) return;
-#if DEBUG
-        LogWrapper.Debug(Module, $"[Animation] TopLevel 已打开，重新解析帧驱动：{_Describe(_topLevel)}");
-#endif
         _ResolveAndDrive();
     }
 
     private static void _OnTopLevelClosed(object? sender, EventArgs e)
     {
         if (!IsRunning) return;
-#if DEBUG
-        LogWrapper.Debug(Module, $"[Animation] TopLevel 已关闭，重新解析帧驱动：{_Describe(_topLevel)}");
-#endif
         _DetachTopLevel();
         _rafToken++;
         _rafScheduled = false;
@@ -188,7 +191,7 @@ internal static class UiFramePump
 
     private static void _RequestRaf()
     {
-        if (!IsRunning || _rafScheduled || _topLevel is null) return;
+        if (UseTimer || !IsRunning || _rafScheduled || _topLevel is null) return;
 
         var token = ++_rafToken;
         _rafScheduled = true;
@@ -215,16 +218,49 @@ internal static class UiFramePump
         _rafScheduled = false;
         if (!IsRunning) return;
 
+        var now = Stopwatch.GetTimestamp();
+        if (_lastRafStamp != 0
+            && now - _lastRafStamp
+            < RapidRafThresholdMilliseconds * (Stopwatch.Frequency / 1000d))
+            _rapidRafCount++;
+        else
+            _rapidRafCount = 0;
+        _lastRafStamp = now;
+
+        if (_rapidRafCount >= RapidRafCountLimit)
+        {
+            SwitchToTimer();
+            return;
+        }
+
+        DiagRafCall();
         _StopFrameTimer();
         _Tick(renderingTime);
         _RequestRaf();
+    }
+
+    /// <summary>
+    ///     RAF 回调过密时切换到定时器。原生 Wayland 的合成器在持续动画期间
+    ///     可能以远高于刷新率的频率推进 composition，继续请求 RAF 会让 UI 线程自旋。
+    /// </summary>
+    private static void SwitchToTimer()
+    {
+        if (_timerPreferred) return;
+
+        _timerPreferred = true;
+        _rafToken++;
+        _rafScheduled = false;
+        _lastRafStamp = 0;
+        _rapidRafCount = 0;
+        _StartFrameTimer();
+        _LogMode("timer", "RAF 回调过密，已切换为定时器");
     }
 
     private static void _StartFrameTimer()
     {
         if (_frameTimer is not null) return;
 
-        _frameTimer = new DispatcherTimer(DispatcherPriority.Render, Dispatcher.UIThread)
+        _frameTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher.UIThread)
         {
             Interval = TimeSpan.FromMilliseconds(Math.Max(1d, 1000d / FallbackFps))
         };
@@ -244,6 +280,7 @@ internal static class UiFramePump
     private static void _OnFrameTimerTick(object? sender, EventArgs e)
     {
         if (!IsRunning) return;
+        DiagTimerCall();
         _Tick(null);
     }
 
@@ -271,6 +308,12 @@ internal static class UiFramePump
     private static void _OnRetryTimerTick(object? sender, EventArgs e)
     {
         if (!IsRunning) return;
+
+        if (UseTimer)
+        {
+            _StartFrameTimer();
+            return;
+        }
 
         var resolved = _ResolveTopLevel();
         if (!ReferenceEquals(resolved, _topLevel))
@@ -303,23 +346,6 @@ internal static class UiFramePump
 
     private static void _Tick(TimeSpan? renderingTime)
     {
-#if DEBUG
-        _statTicks++;
-        var tickStamp = Stopwatch.GetTimestamp();
-        if (_lastTickStamp != 0)
-        {
-            var intervalMs =
-                (tickStamp - _lastTickStamp) * 1000d / Stopwatch.Frequency;
-            if (intervalMs > _statMaxIntervalMs)
-                _statMaxIntervalMs = intervalMs;
-            if (intervalMs > SlowFrameMilliseconds)
-                _statSlowTicks++;
-        }
-
-        _lastTickStamp = tickStamp;
-        var tickStart = Stopwatch.GetTimestamp();
-#endif
-
         AvaloniaRenderingClock[] subscribers;
         lock (SyncRoot)
         {
@@ -327,6 +353,7 @@ internal static class UiFramePump
             subscribers = [.. Subscribers];
         }
 
+        var diagTick = DiagTickStart();
         foreach (var clock in subscribers)
             try
             {
@@ -337,30 +364,7 @@ internal static class UiFramePump
                 LogWrapper.Warn(ex, Module, "[Animation] 帧回调执行失败");
             }
 
-#if DEBUG
-        var tickMs = (Stopwatch.GetTimestamp() - tickStart) * 1000d / Stopwatch.Frequency;
-        if (tickMs > _statMaxTickMs)
-            _statMaxTickMs = tickMs;
-
-        var elapsed = Stopwatch.GetTimestamp() - _statStartStamp;
-        if (elapsed < StatWindowMilliseconds * (Stopwatch.Frequency / 1000d)) return;
-
-        var fps = _statTicks * 1000d / (elapsed * 1000d / Stopwatch.Frequency);
-        _statStartStamp = Stopwatch.GetTimestamp();
-        _statTicks = 0;
-        LogWrapper.Debug(
-            Module,
-            $"[Animation] 帧驱动模式 clock={(_frameTimer is null ? "raf" : "timer")} "
-            + $"fps≈{Math.Round(fps, 1)} "
-            + $"maxFrame={_statMaxIntervalMs:0.#}ms "
-            + $"maxTick={_statMaxTickMs:0.#}ms "
-            + $"slowFrames={_statSlowTicks} "
-            + $"gc={GC.CollectionCount(0)}/{GC.CollectionCount(1)}/{GC.CollectionCount(2)} "
-            + $"TopLevel={_Describe(_topLevel)}");
-        _statMaxIntervalMs = 0d;
-        _statMaxTickMs = 0d;
-        _statSlowTicks = 0;
-#endif
+        DiagTickEnd(diagTick);
     }
 
     private static void _LogMode(string mode, string detail)
@@ -368,15 +372,7 @@ internal static class UiFramePump
         if (_loggedMode == mode) return;
 
         var message = $"[Animation] 帧驱动模式 clock={mode}，{detail}";
-#if DEBUG
-        if (mode == "raf")
-        {
-            LogWrapper.Debug(Module, message);
-            _loggedMode = mode;
-            return;
-        }
-#endif
-        LogWrapper.Warn(Module, message);
+        LogWrapper.Debug(Module, message);
         _loggedMode = mode;
     }
 
