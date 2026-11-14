@@ -46,8 +46,8 @@ public static class MacOsNativeMenu
     {
         if (_application is null) return;
 
-        var appMenu = new NativeMenu
-        {
+        UpdateMenu(
+            _application,
             CreateItem("Main.Menu.About", () => Navigate(PageType.Setup, PageSubType.SetupAbout)),
             CreateItem(
                 "Main.Menu.Preferences",
@@ -61,9 +61,7 @@ public static class MacOsNativeMenu
             CreateItem(
                 "Main.Menu.Quit",
                 () => MainWindow.Current?.Close(),
-                new KeyGesture(Key.Q, KeyModifiers.Meta))
-        };
-        NativeMenu.SetMenu(_application, appMenu);
+                new KeyGesture(Key.Q, KeyModifiers.Meta)));
 
         if (_window is null) return;
 
@@ -118,8 +116,8 @@ public static class MacOsNativeMenu
             CreateItem("Main.Menu.Help", OpenHelp)
         };
 
-        var menu = new NativeMenu
-        {
+        UpdateMenu(
+            _window,
             new NativeMenuItem(Lang.Text("Main.Menu.File"))
             {
                 Menu = fileMenu
@@ -135,9 +133,17 @@ public static class MacOsNativeMenu
             new NativeMenuItem(Lang.Text("Main.Menu.Help"))
             {
                 Menu = helpMenu
-            }
-        };
-        NativeMenu.SetMenu(_window, menu);
+            });
+    }
+
+    private static void UpdateMenu(AvaloniaObject owner, params NativeMenuItemBase[] items)
+    {
+        // 原生导出器持有菜单实例；更新内容而非替换根菜单，兼容启动导出和语言切换。
+        var menu = NativeMenu.GetMenu(owner) ?? new NativeMenu();
+        menu.Items.Clear();
+        foreach (var item in items)
+            menu.Add(item);
+        NativeMenu.SetMenu(owner, menu);
     }
 
     private static NativeMenuItem CreateItem(
