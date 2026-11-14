@@ -12,7 +12,7 @@ public static class PlatformRegistration
         var module = PlatformModuleFactory.Create();
         PlatformRuntime.Initialize(module);
 
-        PlatformServices.UiDispatcher = new UiDispatcher();
+        PlatformServices.UiDispatcher = new AvaloniaUiDispatcher();
         PlatformServices.FileDialogs = module.FileDialogs;
         PlatformServices.DialogService = module.FatalDialog;
         PlatformServices.ResourceStore = new ResourceStore();

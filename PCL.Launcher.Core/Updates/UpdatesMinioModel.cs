@@ -41,7 +41,7 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
         return true;
     }
 
-    public VersionDataModel GetLatestVersion(UpdateChannel channel, UpdateArch arch)
+    public VersionDataModel GetLatestVersion(UpdateSourceChannel channel, UpdateArch arch)
     {
         if (_remoteCache is null)
             RefreshCache();
@@ -50,7 +50,7 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
     }
 
     public bool IsLatest(
-        UpdateChannel channel,
+        UpdateSourceChannel channel,
         UpdateArch arch,
         SemVer currentVersion,
         int currentVersionCode)
@@ -67,13 +67,12 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
             RefreshCache();
         var deJsonData = GetRemoteInfoByName("announcement")
             ?.ToObject<VersionAnnouncementDataModel>();
-        if (deJsonData is null)
-            throw new NullReferenceException("Can not get remote announcement info!");
-        return deJsonData;
+        return deJsonData
+            ?? throw new NullReferenceException("Can not get remote announcement info!");
     }
 
     public List<Loading.LoaderBase> GetDownloadLoader(
-        UpdateChannel channel,
+        UpdateSourceChannel channel,
         UpdateArch arch,
         string output)
     {
@@ -171,7 +170,7 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
         return loaders;
     }
 
-    private VersionDataModel GetChannelInfo(UpdateChannel channel, UpdateArch arch)
+    private VersionDataModel GetChannelInfo(UpdateSourceChannel channel, UpdateArch arch)
     {
         var channelName = GetChannelName(channel, arch);
         var deJsonData = GetRemoteInfoByName($"updates-{channelName}", "updates/")
@@ -220,7 +219,7 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
     /// <param name="path"></param>
     /// <param name="hash"></param>
     /// <returns></returns>
-    private bool IsCacheValid(string path, string hash)
+    private static bool IsCacheValid(string path, string hash)
     {
         var cacheFile = Path.Combine(LauncherPaths.Temp, "Cache", "Update", path);
         var fileInfo = new FileInfo(cacheFile);
@@ -229,48 +228,22 @@ public class UpdatesMinioModel : IUpdateSource // 社区自己的更新系统格
             && (LauncherCommon.GetFileMd5(cacheFile) ?? "") == (hash ?? "");
     }
 
-    private string GetChannelName(UpdateChannel channel, UpdateArch arch)
+    private static string GetChannelName(UpdateSourceChannel channel, UpdateArch arch)
     {
         var channelName = string.Empty;
-        switch (channel)
+        channelName += channel switch
         {
-            case UpdateChannel.Stable:
-            {
-                channelName += "sr";
-                break;
-            }
-            case UpdateChannel.Beta:
-            {
-                channelName += "fr";
-                break;
-            }
+            UpdateSourceChannel.Stable => "sr",
+            UpdateSourceChannel.Beta => "fr",
+            _ => "sr"
+        };
 
-            default:
-            {
-                channelName += "sr";
-                break;
-            }
-        }
-
-        switch (arch)
+        channelName += arch switch
         {
-            case UpdateArch.X64:
-            {
-                channelName += "x64";
-                break;
-            }
-            case UpdateArch.Arm64:
-            {
-                channelName += "arm64";
-                break;
-            }
-
-            default:
-            {
-                channelName += "x64";
-                break;
-            }
-        }
+            UpdateArch.X64 => "x64",
+            UpdateArch.Arm64 => "arm64",
+            _ => "x64"
+        };
 
         return channelName;
     }

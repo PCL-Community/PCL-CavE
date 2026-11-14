@@ -288,7 +288,6 @@
                         <ui:MyComboBox x:Name="ComboServerLoginRequire"
                                        Grid.Row="0"
                                        Grid.Column="1"
-                                       Grid.ColumnSpan="2"
                                        HorizontalAlignment="Stretch">
                             <ui:MyComboBoxItem Content="{loc:Loc Instance.Setup.Server.LoginMethod.Unlimited}"
                                                IsSelected="True" />
@@ -307,7 +306,6 @@
                         <ui:MyTextBox x:Name="TextServerAuthServer"
                                       Grid.Row="1"
                                       Grid.Column="1"
-                                      Grid.ColumnSpan="2"
                                       Margin="0,8,0,0"
                                       IsVisible="False"
                                       ShowValidateResult="False"
@@ -323,7 +321,6 @@
                         <ui:MyTextBox x:Name="TextServerAuthRegister"
                                       Grid.Row="2"
                                       Grid.Column="1"
-                                      Grid.ColumnSpan="2"
                                       Margin="0,8,0,0"
                                       IsVisible="False"
                                       ShowValidateResult="False"
@@ -339,7 +336,6 @@
                         <ui:MyTextBox x:Name="TextServerAuthName"
                                       Grid.Row="3"
                                       Grid.Column="1"
-                                      Grid.ColumnSpan="2"
                                       Margin="0,8,0,0"
                                       IsVisible="False"
                                       ShowValidateResult="False"
@@ -353,7 +349,6 @@
                         <ui:MyTextBox x:Name="TextServerEnter"
                                       Grid.Row="5"
                                       Grid.Column="1"
-                                      Grid.ColumnSpan="2"
                                       ToolTip.Tip="{loc:Loc Instance.Setup.Server.AutoJoin.ToolTip}" />
                     </Grid>
 
@@ -403,7 +398,6 @@
                     <ui:MyComboBox x:Name="ComboAdvanceRenderer"
                                    Grid.Row="0"
                                    Grid.Column="1"
-                                   Grid.ColumnSpan="2"
                                    HorizontalAlignment="Stretch">
                         <ui:MyComboBoxItem Content="{loc:Loc Instance.Setup.FollowGlobal}"
                                            IsSelected="True" />
@@ -421,7 +415,6 @@
                     <ui:MyTextBox x:Name="TextAdvanceJvm"
                                   Grid.Row="2"
                                   Grid.Column="1"
-                                  Grid.ColumnSpan="2"
                                   Height="100"
                                   MinHeight="100"
                                   Padding="0,5"
@@ -441,7 +434,6 @@
                     <ui:MyTextBox x:Name="TextAdvanceGame"
                                   Grid.Row="4"
                                   Grid.Column="1"
-                                  Grid.ColumnSpan="2"
                                   HintText="{loc:Loc Instance.Setup.FollowGlobal}"
                                   ToolTip.Tip="{loc:Loc Instance.Setup.Advanced.GameArgs.ToolTip}" />
 
@@ -453,7 +445,6 @@
                     <ui:MyTextBox x:Name="TextAdvanceClasspathHead"
                                   Grid.Row="6"
                                   Grid.Column="1"
-                                  Grid.ColumnSpan="2"
                                   ToolTip.Tip="{loc:Loc Instance.Setup.Advanced.Classpath.ToolTip}" />
 
                     <TextBlock Grid.Row="8"
@@ -464,13 +455,11 @@
                     <ui:MyTextBox x:Name="TextAdvanceRun"
                                   Grid.Row="8"
                                   Grid.Column="1"
-                                  Grid.ColumnSpan="2"
                                   Margin="0,0,0,3"
                                   HintText=""
                                   ToolTip.Tip="{loc:Loc Instance.Setup.Advanced.PreLaunchCommand.ToolTip}" />
 
                     <StackPanel Grid.Row="9"
-                                Grid.ColumnSpan="2"
                                 Margin="0,8,0,4"
                                 HorizontalAlignment="Left">
                         <ui:MyCheckBox x:Name="CheckAdvanceRunWait"

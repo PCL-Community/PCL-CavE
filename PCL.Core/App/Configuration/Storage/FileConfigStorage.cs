@@ -1,6 +1,3 @@
-using PCL.Core.App.Localization;
-using PCL.Core.Logging;
-using PCL.Core.UI.Dialogs;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -10,19 +7,17 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using PCL.Core.App.Localization;
+using PCL.Core.Logging;
+using PCL.Core.UI.Dialogs;
 
 namespace PCL.Core.App.Configuration.Storage;
 
 /// <summary>
-/// 文件存取仓库。
+///     文件存取仓库。
 /// </summary>
 public class FileConfigStorage : ConfigStorage
 {
-    /// <summary>
-    /// 键值文件实例。
-    /// </summary>
-    public IKeyValueFileProvider File { get; }
-
     private readonly Channel<(string, Action)> _writeActionChannel;
     private readonly CancellationTokenSource _writeActionCts;
     private readonly ManualResetEventSlim _writeStopEvent = new(false);
@@ -46,14 +41,18 @@ public class FileConfigStorage : ConfigStorage
                     // 读入并合并暂存操作
                     var (key, action) = await reader.ReadAsync(cancelToken);
                     writeActionMap[key] = action;
-                    if (Environment.TickCount64 - lastSyncTick < syncInterval || cancelToken.IsCancellationRequested) continue;
+                    if (Environment.TickCount64 - lastSyncTick < syncInterval
+                        || cancelToken.IsCancellationRequested) continue;
                     // 同步文件
                     Sync();
                     lastSyncTick = Environment.TickCount64;
                     writeActionMap.Clear();
                 }
             }
-            catch (OperationCanceledException) { /* ignoring*/ }
+            catch (OperationCanceledException)
+            {
+                /* ignoring*/
+            }
             finally
             {
                 // 停止前先排空通道中尚未被 ReadAsync 读取的写入：
@@ -64,6 +63,9 @@ public class FileConfigStorage : ConfigStorage
                 Sync();
                 _writeStopEvent.Set();
             }
+
+            return;
+
             void Sync()
             {
                 try
@@ -77,21 +79,23 @@ public class FileConfigStorage : ConfigStorage
                     LogWrapper.Error(ex, "Config", "配置文件保存失败");
                     var summary = Lang.Text("Config.Error.SaveFailed.Message", File.FilePath);
                     var message = ExceptionDetails.Compose(summary, ex);
-                    //MsgBoxWrapper.Show(
-                    //    message,
-                    //    Lang.Text("Config.Error.SaveFailed.Title"),
-                    //    MsgBoxTheme.Error);
 
-                    DialogService.Instance.Show(new TextDialogRequest
-                    {
-                        Title = Lang.Text("Config.Error.SaveFailed.Title"),
-                        Content = message,
-                        IsWarn = true
-                    });
+                    DialogService.Instance.Show(
+                        new TextDialogRequest
+                        {
+                            Title = Lang.Text("Config.Error.SaveFailed.Title"),
+                            Content = message,
+                            IsWarn = true
+                        });
                 }
             }
         });
     }
+
+    /// <summary>
+    ///     键值文件实例。
+    /// </summary>
+    public IKeyValueFileProvider File { get; }
 
     protected override void OnStop()
     {
@@ -106,8 +110,9 @@ public class FileConfigStorage : ConfigStorage
         [NotNullWhen(true)] ref TValue value,
         object? argument)
     {
-        if (key is not string strKey) throw new NotSupportedException($"Key '{key}' is not supported");
-#pragma warning disable CS8762 // Parameter must have a non-null value when exiting in some condition.
+        if (key is not string strKey)
+            throw new NotSupportedException($"Key '{key}' is not supported");
+#pragma warning disable CS8762
         switch (action)
         {
             case StorageAction.Get:
@@ -138,13 +143,18 @@ public class FileConfigStorage : ConfigStorage
                             LogWrapper.Error(cleanupEx, "Config", $"配置项 {strKey} 同步删除失败，可能需人工处理");
                         }
                     }
+
                     return false;
                 }
+
                 return true;
             case StorageAction.Exists:
                 // 由于 Exists 的 value 类型一定是 bool，此处可 unsafe 直接赋值
-                if (typeof(TValue) == typeof(bool)) Unsafe.As<TValue, bool>(ref value) = File.Exists(strKey);
-                else throw new InvalidOperationException($"Storage action '{StorageAction.Exists}' must have a boolean value");
+                if (typeof(TValue) == typeof(bool))
+                    Unsafe.As<TValue, bool>(ref value) = File.Exists(strKey);
+                else
+                    throw new InvalidOperationException(
+                        $"Storage action '{StorageAction.Exists}' must have a boolean value");
                 return true;
             case StorageAction.Set:
                 var localValue = value;
@@ -155,8 +165,11 @@ public class FileConfigStorage : ConfigStorage
                 return false;
             default: throw new InvalidOperationException($"Invalid storage action: {action}");
         }
-#pragma warning restore CS8762 // Parameter must have a non-null value when exiting in some condition.
+#pragma warning restore CS8762
     }
 
-    public override string ToString() => $"{base.ToString()} ({File.FilePath})";
+    public override string ToString()
+    {
+        return $"{base.ToString()} ({File.FilePath})";
+    }
 }

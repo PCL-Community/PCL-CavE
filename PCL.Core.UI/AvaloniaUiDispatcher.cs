@@ -5,7 +5,7 @@ using PCL.Core.Platform;
 namespace PCL.Core.UI;
 
 /// <summary>基于 Avalonia <see cref="Dispatcher.UIThread" /> 的 UI 调度实现。</summary>
-public sealed class UiDispatcher : IUiDispatcher
+public sealed class AvaloniaUiDispatcher : IUiDispatcher
 {
     public bool CheckAccess()
     {
@@ -16,7 +16,6 @@ public sealed class UiDispatcher : IUiDispatcher
     {
         if (Lifecycle.HasShutdownStarted) return;
 
-        // IUiDispatcher.Post 的契约是排队而不是执行；在 UI 线程上也必须排队，避免同步重入。
         Dispatcher.UIThread.Post(action, DispatcherPriority.Normal);
     }
 

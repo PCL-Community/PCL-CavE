@@ -27,7 +27,7 @@
                                    Text="{loc:Loc Setup.Ui.Basic.Opacity}" />
                         <ui:MySlider x:Name="SliderLauncherOpacity"
                                      Grid.Column="1"
-                                     Grid.ColumnSpan="5"
+                                     Grid.ColumnSpan="4"
                                      MaxValue="600"
                                      ValueByKey="10"
                                      Value="{Binding LauncherOpacity, Mode=TwoWay}" />

@@ -18,10 +18,6 @@ namespace PCL.UI.Controls;
 /// </summary>
 public partial class MyIconTextButton : Border
 {
-    public delegate void ChangeEventHandler(object? sender, bool raiseByMouse);
-
-    public delegate void CheckEventHandler(object? sender, bool raiseByMouse);
-
     public delegate void ClickEventHandler(object? sender, RouteEventArgs e);
 
     public enum ColorState
@@ -171,10 +167,6 @@ public partial class MyIconTextButton : Border
     private string ForegroundKey => ButtonAnimation.Name("MyIconTextButton Foreground", Uuid);
 
     private string IconKey => ButtonAnimation.Name("MyIconTextButton Icon", Uuid);
-
-    public event CheckEventHandler? Check;
-
-    public event ChangeEventHandler? Change;
 
     public event ClickEventHandler? Click;
 

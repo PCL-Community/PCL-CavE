@@ -97,8 +97,8 @@ public partial class PageSetupUpdateViewModel : ViewModelBase
         try
         {
             var channel = UpdateManager.IsCurrentVersionBeta
-                ? UpdateChannel.Beta
-                : UpdateChannel.Stable;
+                ? UpdateSourceChannel.Beta
+                : UpdateSourceChannel.Stable;
             var arch = SystemInfo.IsArm64System ? UpdateArch.Arm64 : UpdateArch.X64;
             var isLatest = await UpdateManager.remoteServer.IsLatestAsync(
                 channel,
@@ -341,7 +341,7 @@ public partial class PageSetupUpdateViewModel : ViewModelBase
                 }
             }
 
-            Config.Update.UpdateChannel = (Core.App.UpdateChannel)index;
+            Config.Update.UpdateChannel = (UpdateChannel)index;
             return true;
         }
         catch (Exception ex)

@@ -1,6 +1,6 @@
 namespace PCL;
 
-public enum UpdateChannel
+public enum UpdateSourceChannel
 {
     Stable,
     Beta

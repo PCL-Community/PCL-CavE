@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
@@ -16,18 +15,11 @@ public class MyScrollViewer : ScrollViewer
 {
     private const double WheelScrollStep = 120d; // 一个滚轮刻度对应的像素数
     private const int WheelAnimationTime = 300;
-    private const string VerticalBarPartName = "PART_VerticalScrollBar";
-    private const string HorizontalBarPartName = "PART_HorizontalScrollBar";
 
     public static readonly StyledProperty<Thickness> ScrollBarMarginProperty =
         AvaloniaProperty.Register<MyScrollViewer, Thickness>(nameof(ScrollBarMargin));
 
     private double _realOffset;
-
-    /// <summary>模板中的水平滚动条；模板应用后可用。</summary>
-    public MyScrollBar? horizontalScrollBar;
-
-    public MyScrollBar? scrollBar;
 
     public MyScrollViewer()
     {
@@ -64,13 +56,6 @@ public class MyScrollViewer : ScrollViewer
             return;
 
         base.OnGotFocus(e);
-    }
-
-    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
-    {
-        base.OnApplyTemplate(e);
-        scrollBar = e.NameScope.Find<MyScrollBar>(VerticalBarPartName);
-        horizontalScrollBar = e.NameScope.Find<MyScrollBar>(HorizontalBarPartName);
     }
 
     /// <summary>按像素增量滚动垂直偏移；动画关闭或控件未加载时直接落到目标位置。</summary>
@@ -144,7 +129,7 @@ public class MyScrollViewer : ScrollViewer
             NotifyBackButtonRefresh();
     }
 
-    private void NotifyBackButtonRefresh()
+    private static void NotifyBackButtonRefresh()
     {
         ExtraButtonsPanel.Current?.RefreshBackButton();
     }

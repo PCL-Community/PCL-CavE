@@ -43,7 +43,7 @@ public static class UpdateManager
         {
             if (LauncherCommon.VersionBaseName.Contains("beta"))
                 return true;
-            return (int)Config.Update.UpdateChannel == 1;
+            return Config.Update.UpdateChannel == UpdateChannel.Beta;
         }
     }
 
@@ -51,11 +51,11 @@ public static class UpdateManager
     {
         try
         {
-            if (!IsCurrentVersionBeta || (int)Config.Update.UpdateChannel == 1)
+            if (!IsCurrentVersionBeta || Config.Update.UpdateChannel == UpdateChannel.Beta)
                 return remoteServer.IsLatest(
                     IsCurrentVersionBeta
-                        ? UpdateChannel.Beta
-                        : UpdateChannel.Stable,
+                        ? UpdateSourceChannel.Beta
+                        : UpdateSourceChannel.Stable,
                     SystemInfo.IsArm64System
                         ? UpdateArch.Arm64
                         : UpdateArch.X64,
@@ -65,14 +65,14 @@ public static class UpdateManager
                     : UpdateEnums.VersionStatus.NotLatest;
 
             var isNewerThanStable = remoteServer.IsLatest(
-                UpdateChannel.Stable,
+                UpdateSourceChannel.Stable,
                 SystemInfo.IsArm64System
                     ? UpdateArch.Arm64
                     : UpdateArch.X64,
                 SemVer.Parse(LauncherCommon.VersionBaseName),
                 LauncherCommon.VersionCode);
             var isBetaLatest = remoteServer.IsLatest(
-                UpdateChannel.Beta,
+                UpdateSourceChannel.Beta,
                 SystemInfo.IsArm64System
                     ? UpdateArch.Arm64
                     : UpdateArch.X64,
@@ -116,7 +116,7 @@ public static class UpdateManager
             try
             {
                 var version = remoteServer.GetLatestVersion(
-                    IsCurrentVersionBeta ? UpdateChannel.Beta : UpdateChannel.Stable,
+                    IsCurrentVersionBeta ? UpdateSourceChannel.Beta : UpdateSourceChannel.Stable,
                     SystemInfo.IsArm64System ? UpdateArch.Arm64 : UpdateArch.X64
                 );
 
@@ -150,7 +150,9 @@ public static class UpdateManager
                 // 下载
                 loaders.AddRange(
                     remoteServer.GetDownloadLoader(
-                        IsCurrentVersionBeta ? UpdateChannel.Beta : UpdateChannel.Stable,
+                        IsCurrentVersionBeta
+                            ? UpdateSourceChannel.Beta
+                            : UpdateSourceChannel.Stable,
                         SystemInfo.IsArm64System ? UpdateArch.Arm64 : UpdateArch.X64,
                         dlTargetPath));
                 loaders.Add(
@@ -293,7 +295,7 @@ public static class UpdateManager
         // 注意：如果要自行实现这个功能，请换用另一个文件路径，以免与官方版本冲突
         var latestPclPath = Path.Combine(LauncherPaths.Temp, "CE-Latest.exe");
         var target = remoteServer.GetLatestVersion(
-            UpdateChannel.Stable,
+            UpdateSourceChannel.Stable,
             SystemInfo.IsArm64System ? UpdateArch.Arm64 : UpdateArch.X64);
         if (target is null)
             throw new Exception(Lang.Text("Update.Error.UnableToGetUpdate"));
@@ -312,7 +314,7 @@ public static class UpdateManager
         }
 
         var loaders = remoteServer.GetDownloadLoader(
-            UpdateChannel.Stable,
+            UpdateSourceChannel.Stable,
             SystemInfo.IsArm64System ? UpdateArch.Arm64 : UpdateArch.X64,
             latestPclPath);
         var loader =
