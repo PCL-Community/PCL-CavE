@@ -61,10 +61,7 @@ Everyone is welcome to try it out!
 
 | Version | Architecture | Support | Requirements |
 |---|---|---|---|
-| macOS 12 or later | Apple Silicon (ARM64) | ✅ Supported | [.NET 11 Runtime](https://get.dot.net/11) |
-| Intel-based macOS | x64 | ❌ Not supported | / |
-
-<small>Intel (x64) macOS builds are no longer provided.</small>
+| macOS 12 or later | Apple Silicon (ARM64), Intel (x64) | ✅ Supported | [.NET 11 Runtime](https://get.dot.net/11) |
 
 **✅ Fully supported**: We will provide as much support as possible. Please make sure you are using the latest version.
 

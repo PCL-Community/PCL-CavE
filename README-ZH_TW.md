@@ -61,10 +61,7 @@ PCL CE 是基於 PCL 開放原始碼二次開發的社群版本，包括了主�
 
 | 版本 | 架構 | 支援情況 | 環境要求 |
 |---|---|---|---|
-| macOS 12 及以上 | Apple Silicon (ARM64) | ✅ 支援 | [.NET 11 Runtime](https://get.dot.net/11) |
-| Intel 版 macOS | x64 | ❌ 不支援 | / |
-
-macOS 不再提供 Intel（x64）版本。
+| macOS 12 及以上 | Apple Silicon (ARM64)、Intel (x64) | ✅ 支援 | [.NET 11 Runtime](https://get.dot.net/11) |
 
 **✅ 完整支援**：會盡量提供支援，但請先確保使用最新版本。
 
