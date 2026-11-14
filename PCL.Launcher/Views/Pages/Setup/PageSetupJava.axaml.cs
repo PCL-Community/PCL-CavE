@@ -124,7 +124,7 @@ public partial class PageSetupJava : MyPageRight, IRefreshable
         {
             Title = PageSetupJavaViewModel.BuildTitle(entry),
             Info = PageSetupJavaViewModel.BuildInfo(entry),
-            Tags = PageSetupJavaViewModel.BuildTags(entry),
+            PlainTags = PageSetupJavaViewModel.BuildTags(entry),
             Type = MyListItem.CheckType.RadioBox
         };
         item.Check += (_, args) =>
