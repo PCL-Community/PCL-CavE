@@ -15,12 +15,11 @@ using PCL.Views.Pages.Download;
 namespace PCL.Views.Pages.Instance;
 
 /// <summary>
-///     实例安装/修改页：展示当前实例摘要，并复用 <see cref="InstallLoaderSelector" /> 提供
-///     完整的 Minecraft 版本列表与 11 种加载器/附属组件选择。支持修改、重置、补全文件与跳转下载页。
+///     实例安装/修改页：进入后直接展示当前实例的加载器选择，点击 Minecraft 卡片才回到版本列表。
+///     加载器选择复用 <see cref="InstallLoaderSelector" />。
 /// </summary>
 public partial class PageInstanceInstall : MyPageRight, IRefreshable
 {
-    private readonly DispatcherTimer _progressTimer;
     private readonly InstallLoaderSelector _selector = null!;
     private readonly bool _uiBuilt;
     private readonly PageInstanceInstallViewModel _vm = new();
@@ -36,6 +35,7 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
     private Loading.LoaderCombo<string>? _installCombo;
     private McInstance? _instance;
     private string _instanceFolder = "";
+    private string _baselineInfo = "";
     private string _versionIcon = $"{LauncherPaths.ImageRoot}Icons/NoIcon.png";
 
     public PageInstanceInstall()
@@ -54,14 +54,7 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
             e.handled = true;
         };
 
-        _progressTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(200)
-        };
-        _progressTimer.Tick += (_, _) => RefreshProgressText();
-
         BtnStart.Click += (_, _) => _ = StartInstallAsync();
-        BtnCancel.Click += (_, _) => _installCombo?.Abort();
         BtnRetryVersions.Click += (_, _) => RetryVersionList();
 
         GameDownload.dlClientListLoader.PreviewFinish +=
@@ -73,7 +66,15 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
         GameDownload.DlLabyModListLoader.OnStateChangedUi += OnComponentListStateChanged;
 
         RefreshStaticText();
-        ShowSummaryStage(false);
+        PageLoaderInit(
+            LoadMinecraft,
+            PanLoad,
+            PanAllBack,
+            null,
+            GameDownload.dlClientListLoader,
+            _ => EnterCurrentSelection(false));
+        PanMinecraft.IsVisible = false;
+        PanSelect.IsVisible = false;
     }
 
     private bool CanAnimateStage =>
@@ -95,18 +96,7 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
         if (!_uiBuilt || _vm.IsInstalling)
             return;
 
-        var resolved = InstancePageHelper.ResolveInstance(null);
-        var instanceChanged = resolved is not null
-            && !string.Equals(
-                resolved.PathInstance,
-                _instance?.PathInstance,
-                StringComparison.OrdinalIgnoreCase);
-        if (resolved is null)
-            _instance = null;
-        else if (_instance is null || instanceChanged)
-            _instance = resolved;
-        else
-            _instance = new McInstance(resolved.PathInstance);
+        ReloadInstance(InstancePageHelper.ResolveInstance(null));
         if (_instance is null)
         {
             UpdateSummary(null);
@@ -115,22 +105,10 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
             return;
         }
 
-        LoadCurrentApiInfo(_instance);
-        UpdateSummary(_instance, !_vm.IsSelecting || instanceChanged);
-        UpdateActionAvailability();
-        if (instanceChanged && _vm.IsSelecting)
-        {
-            BeginSelection(false);
-            return;
-        }
-
-        EnsureVersionListLoaded(true);
-        if (_vm.IsSelecting)
-        {
-            TryResolveExistingLabyMod();
-            TryApplyCurrentApis();
-            OnSelectionChanged();
-        }
+        RestartVersionCatalogs();
+        PageLoaderRestart();
+        if (GameDownload.dlClientListLoader.State == LoadState.Finished)
+            EnterCurrentSelection(true);
     }
 
     public void Reload()
@@ -140,15 +118,7 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
 
     public override void OnNavigatedTo(object? parameter)
     {
-        var resolved = InstancePageHelper.ResolveInstance(parameter);
-        if (resolved is null)
-            _instance = null;
-        else if (_instance is null
-                 || !string.Equals(
-                     _instance.PathInstance,
-                     resolved.PathInstance,
-                     StringComparison.OrdinalIgnoreCase))
-            _instance = resolved;
+        ReloadInstance(InstancePageHelper.ResolveInstance(parameter));
         if (_instance is null)
         {
             UpdateSummary(null);
@@ -157,22 +127,12 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
             return;
         }
 
-        LoadCurrentApiInfo(_instance);
-        UpdateSummary(_instance);
-        UpdateActionAvailability();
-        if (_vm.IsInstalling)
-        {
-            _vm.IsSelecting = true;
-            PanMinecraft.IsVisible = false;
-            PanSelect.IsVisible = false;
-            BtnStart.Show = false;
-            CardProgress.IsVisible = true;
-            PanBack?.ScrollToHome();
+        _vm.IsInstalling = false;
+        _selector.SetInstalling(false);
+        if (GameDownload.dlClientListLoader.State != LoadState.Finished)
             return;
-        }
 
-        EnsureVersionListLoaded(false);
-        ShowSummaryStage(false);
+        EnterCurrentSelection(false);
     }
 
     protected override void RefreshLocalization()
@@ -211,7 +171,6 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
     private void RefreshStaticText()
     {
         CardMinecraft.Title = Lang.Text("Common.Installation.Minecraft");
-        BtnCancel.Text = Lang.Text("Common.Action.Cancel");
         BtnRetryVersions.Text = Lang.Text("Launch.Homepage.LoadFailed.Retry");
         LoadVersionList.Text = Lang.Text("Download.Version.LoadingList");
     }
@@ -308,11 +267,55 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
         return grid;
     }
 
+    private void EnterCurrentSelection(bool forceRestartLoaders)
+    {
+        if (!_uiBuilt || _instance is null)
+            return;
+
+        var info = _instance.Info;
+        BeginSelection(
+            false,
+            info.VanillaName,
+            _instance.JsonObject?["url"]?.ToString(),
+            $"{LauncherPaths.ImageRoot}Blocks/Grass.png",
+            forceRestartLoaders,
+            true);
+    }
+
+    private void ReloadInstance(McInstance? resolved)
+    {
+        _instance = resolved is null ? null : new McInstance(resolved.PathInstance);
+    }
+
+    private static void RestartVersionCatalogs()
+    {
+        try
+        {
+            GameDownload.DlForgeListLoader.Start(0, true);
+            GameDownload.DlOptiFineListLoader.Start(null, true);
+            GameDownload.DlLiteLoaderListLoader.Start(null, true);
+            GameDownload.DlNeoForgeListLoader.Start(null, true);
+            GameDownload.DlCleanroomListLoader.Start(null, true);
+            GameDownload.DlFabricListLoader.Start(null, true);
+            GameDownload.DlLegacyFabricListLoader.Start(null, true);
+            GameDownload.DlLabyModListLoader.Start(null, true);
+            CompDownloadLoaders.DlFabricApiLoader.Start(0, true);
+            CompDownloadLoaders.DlLegacyFabricApiLoader.Start(0, true);
+            CompDownloadLoaders.DlOptiFabricLoader.Start(0, true);
+        }
+        catch (Exception ex)
+        {
+            LauncherCommon.Log(ex, "刷新实例修改页加载器列表失败");
+        }
+    }
+
     private void BeginSelection(
         bool reset,
         string? versionName = null,
         string? versionUrl = null,
-        string? versionIcon = null)
+        string? versionIcon = null,
+        bool forceRestartLoaders = false,
+        bool captureBaseline = false)
     {
         if (_instance is null || _vm.IsInstalling)
             return;
@@ -322,22 +325,30 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
         _vm.IsProgressVisible = false;
         _vm.HasWarning = false;
         _vm.WarningText = "";
-        CardProgress.IsVisible = false;
 
         var info = _instance.Info;
         _vm.InstanceName = _instance.Name;
-        _vm.CurrentInfo = FormatLoaders(_instance);
         var selectedName = string.IsNullOrEmpty(versionName) ? info.VanillaName : versionName;
         _vm.VersionName = selectedName;
         _vm.VersionUrl = versionUrl ?? _instance.JsonObject?["url"]?.ToString();
         _versionIcon = versionIcon ?? $"{LauncherPaths.ImageRoot}Blocks/Grass.png";
 
-        _selector.SetMinecraft(selectedName, _vm.VersionUrl);
+        _selector.SetMinecraft(
+            selectedName,
+            _vm.VersionUrl,
+            true,
+            forceRestartLoaders);
         if (string.Equals(selectedName, info.VanillaName, StringComparison.Ordinal))
         {
             _selector.ApplyExisting(_instance);
             TryResolveExistingLabyMod();
             TryApplyCurrentApis();
+        }
+
+        if (captureBaseline)
+        {
+            _baselineInfo = FormatWpfSelectInfo(_selector.Selection, selectedName);
+            _vm.CurrentInfo = _baselineInfo;
         }
 
         _vm.ActionText = Lang.Text(
@@ -367,6 +378,9 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
     {
         _vm.IsSelecting = true;
         BtnStart.Show = true;
+        ShowBackHint();
+        if (PanSelect.IsVisible && !PanMinecraft.IsVisible)
+            return;
         if (!CanAnimateStage)
         {
             PanMinecraft.IsVisible = false;
@@ -379,6 +393,8 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
             return;
         }
 
+        if (PanBack is not null)
+            PanBack.IsHitTestVisible = false;
         AnimationService.CancelAnimationByName(StageAnimationKey);
         PanMinecraft.Opacity = 1d;
         PanMinecraft.RenderTransform = new TranslateTransform();
@@ -396,7 +412,12 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
                         PanBack?.ScrollToHome();
                     },
                     true),
-                new OpacityAnimation(PanSelect, 1d, 250, 150)
+                new OpacityAnimation(PanSelect, 1d, 250, 150),
+                new ActionAnimation(() =>
+                {
+                    if (PanBack is not null)
+                        PanBack.IsHitTestVisible = true;
+                }, true)
             },
             StageAnimationKey,
             true);
@@ -418,6 +439,8 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
             return;
         }
 
+        if (PanBack is not null)
+            PanBack.IsHitTestVisible = false;
         AnimationService.CancelAnimationByName(StageAnimationKey);
         PanMinecraft.IsVisible = true;
         PanMinecraft.Opacity = 0d;
@@ -429,11 +452,24 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
             {
                 new OpacityAnimation(PanSelect, 0d, 90, 10),
                 new ActionAnimation(() => PanSelect.IsVisible = false, true),
-                new OpacityAnimation(PanMinecraft, 1d, 150, 100)
+                new OpacityAnimation(PanMinecraft, 1d, 150, 100),
+                new ActionAnimation(() =>
+                {
+                    if (PanBack is not null)
+                        PanBack.IsHitTestVisible = true;
+                }, true)
             },
             StageAnimationKey,
             true);
         PanBack?.ScrollToHome();
+    }
+
+    private static void ShowBackHint()
+    {
+        if (States.Hint.InstallPageBack)
+            return;
+        States.Hint.InstallPageBack = true;
+        HintService.Show(Hints.Info(Lang.Text("Download.Install.Hint.MinecraftBack")));
     }
 
     private void UpdateActionAvailability()
@@ -452,13 +488,16 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
         if (_selector is null || _instance is null || !_vm.IsSelecting)
             return;
 
-        var selection = _selector.Selection;
-        _vm.SelectedInfo = selection.GetInfo(_vm.VersionName);
+        var selectedInfo = FormatWpfSelectInfo(_selector.Selection, _vm.VersionName);
+        var isReset = IsCurrentSelection();
+        _vm.SelectedInfo = isReset || string.IsNullOrEmpty(_baselineInfo)
+            ? selectedInfo
+            : $"{_baselineInfo} → {selectedInfo}";
         _vm.ActionText = Lang.Text(
-            IsCurrentSelection()
+            isReset
                 ? "Instance.Install.Action.StartReset"
                 : "Instance.Install.Action.StartModify");
-        BtnStart.SvgIcon = IsCurrentSelection()
+        BtnStart.SvgIcon = isReset
             ? "lucide/rotate-ccw"
             : "lucide/pencil";
         _vm.CanStartInstall = !_vm.IsInstalling && !string.IsNullOrEmpty(_vm.VersionName);
@@ -489,12 +528,12 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
         AddWarning(
             flags.FabricApi,
             "Download.Install.Warning.FabricApi",
-            MyHint.Themes.Yellow,
+            MyHint.Themes.Red,
             new Thickness(0d, 1d, 0d, 7d));
         AddWarning(
             flags.OptiFabric,
             "Download.Install.Warning.OptiFabric",
-            MyHint.Themes.Yellow,
+            MyHint.Themes.Red,
             new Thickness(0d, 1d, 0d, 7d));
         AddWarning(
             flags.OptiFabricOld,
@@ -527,16 +566,44 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
 
     private bool IsCurrentSelection()
     {
-        if (_instance is null)
+        if (_instance is null || string.IsNullOrEmpty(_baselineInfo))
             return false;
         return string.Equals(
-                _vm.VersionName,
-                _instance.Info.VanillaName,
-                StringComparison.Ordinal)
-            && string.Equals(
-                _selector.Selection.GetLoaderInfo(),
-                _vm.CurrentInfo,
-                StringComparison.Ordinal);
+            FormatWpfSelectInfo(_selector.Selection, _vm.VersionName),
+            _baselineInfo,
+            StringComparison.Ordinal);
+    }
+
+    private static string FormatWpfSelectInfo(
+        InstallLoaderSelection selection,
+        string? vanillaName)
+    {
+        var parts = new List<string> { vanillaName ?? "" };
+        AddLoader(parts, "Common.Installation.Fabric", selection.FabricVersion?.Replace("+build", ""));
+        AddLoader(parts, "Common.Installation.LegacyFabric", selection.LegacyFabricVersion);
+        AddLoader(parts, "Common.Installation.Forge", selection.Forge?.VersionName);
+        AddLoader(parts, "Common.Installation.NeoForge", selection.NeoForge?.VersionName);
+        AddLoader(parts, "Common.Installation.Cleanroom", selection.Cleanroom?.VersionName);
+        AddLoader(parts, "Common.Installation.LabyMod", selection.LabyModVersion);
+        if (selection.OptiFine is not null)
+        {
+            var display = selection.OptiFine.DisplayName ?? "";
+            if (!string.IsNullOrEmpty(vanillaName))
+                display = display.Replace(vanillaName + " ", "");
+            AddLoader(parts, "Common.Installation.OptiFine", display);
+        }
+
+        if (selection.LiteLoader is not null)
+            parts.Add(Lang.Text("Common.Installation.LiteLoader"));
+        if (parts.Count == 1)
+            parts.Add(Lang.Text("Instance.Install.NoExtraInstall"));
+        return string.Join("  |  ", parts);
+    }
+
+    private static void AddLoader(List<string> parts, string nameKey, string? version)
+    {
+        if (!string.IsNullOrWhiteSpace(version))
+            parts.Add($"{Lang.Text(nameKey)} {version}");
     }
 
     private string GetSelectionIcon()
@@ -920,9 +987,13 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
 
             selection.LabyModChannel = channel;
             selection.LabyModCommitRef = commitRef;
-            selection.LabyModVersion =
-                $"{version} {(channel == "snapshot" ? Lang.Text("Download.Version.Type.Snapshot") : Lang.Text("Download.Version.Type.Stable"))}";
-            _selector.RefreshAll();
+            if (string.IsNullOrEmpty(selection.LabyModVersion))
+            {
+                selection.LabyModVersion =
+                    $"{version} {(channel == "snapshot" ? Lang.Text("Download.Version.Type.Snapshot") : Lang.Text("Download.Version.Type.Stable"))}";
+                _selector.RefreshAll();
+            }
+
             return;
         }
     }
@@ -997,13 +1068,7 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
             return;
         }
 
-        if (_instance.Info.Drop != 99
-            && McVersionComparer.CompareVersion(_instance.Info.VanillaName, "1.5.2") == -1
-            && _instance.Info.HasForge)
-        {
-            HintService.Show(Hints.Info(Lang.Text("Instance.Overall.Reset.NotSupported")));
-            return;
-        }
+
 
         if (string.IsNullOrEmpty(_vm.VersionName))
         {
@@ -1027,8 +1092,7 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
                         DialogButton.Create(
                             Lang.Text("Download.Install.InstanceIsolation.Warning.Cancel")),
                         DialogButton.Create(
-                            Lang.Text("Download.Install.InstanceIsolation.Warning.Continue"))),
-                    IsWarn = true
+                            Lang.Text("Download.Install.InstanceIsolation.Warning.Continue")))
                 });
             if (isolation.Button != 2)
                 return;
@@ -1041,13 +1105,12 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
                 {
                     Title = Lang.Text("Instance.Install.Reset.Title"),
                     Content = Lang.Text("Instance.Install.Reset.Message"),
-                    Buttons = DialogButtons.OkCancel,
-                    IsWarn = true
+                    Buttons = DialogButtons.ContinueCancel
                 });
-            if (!reset.IsConfirmed)
+            if (reset.Button == 2)
                 return;
         }
-
+        DeleteNonIsolatedLabyModFolder(instance);
         var request = new McInstallRequest
         {
             targetInstanceName = instance.Name,
@@ -1090,22 +1153,7 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
             return;
         }
 
-        _vm.IsInstalling = true;
-        _vm.IsProgressVisible = true;
         _vm.CanStartInstall = false;
-        BtnStart.Show = false;
-        UpdateActionAvailability();
-        CardProgress.IsVisible = true;
-        _selector.SetInstalling(true);
-        LoadInstall.Text = Lang.Text("Download.Install.State.Loading");
-        LoadInstall.TextError = "";
-        LoadInstall.ShowProgress = true;
-        LoadInstall.State = new MyLoadingStateSimulator
-        {
-            LoadingState = LoadingState.Run
-        };
-        _progressTimer.Start();
-
         _instanceFolder = instance.PathInstance;
         _installCombo = new Loading.LoaderCombo<string>(
             $"{instance.Name} {_vm.ActionText}",
@@ -1116,8 +1164,30 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
         _installCombo.OnStateChangedUi += OnInstallStateChanged;
         _installCombo.Start(instance.PathInstance);
         Loading.LoaderTaskbarAdd(_installCombo);
+        DeleteReplacedApiFiles();
         LoadingUi.Current?.RefreshDownloadButton();
         PageRouter.Navigate(PageType.Launch);
+    }
+
+    private static void DeleteNonIsolatedLabyModFolder(McInstance instance)
+    {
+        if (!instance.Info.HasLabyMod
+            || string.Equals(
+                instance.PathIndie,
+                instance.PathInstance,
+                StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var folder = Path.Combine(instance.PathIndie, "labymod-neo");
+        try
+        {
+            if (Directory.Exists(folder))
+                Directory.Delete(folder, true);
+        }
+        catch (Exception ex)
+        {
+            LauncherCommon.Log(ex, "删除非隔离实例的 LabyMod 目录失败");
+        }
     }
 
     private void OnInstallStateChanged(
@@ -1128,12 +1198,10 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
         if (newState is LoadState.Waiting or LoadState.Loading)
             return;
 
-        _progressTimer.Stop();
         _vm.IsInstalling = false;
         _vm.IsProgressVisible = false;
-        LoadInstall.ShowProgress = false;
         _selector.SetInstalling(false);
-        McInstallRecovery.HandleTerminalState(loader, _instanceFolder);
+        McInstallRecovery.HandleTerminalState(loader, _instanceFolder, true);
         if (_installCombo is not null)
         {
             _installCombo.OnStateChangedUi -= OnInstallStateChanged;
@@ -1143,30 +1211,21 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
         var finishedName = _instance?.Name ?? "";
         if (newState == LoadState.Finished)
         {
-            CardProgress.IsVisible = false;
-            LoadInstall.State = new MyLoadingStateSimulator();
             HintService.Show(
                 Hints.Success($"{finishedName} {Lang.Text("Download.Install.Finished")}"));
             InstanceList.mcInstanceListForceRefresh = true;
             ApplyFinishedBookkeeping(finishedName);
-            DeleteReplacedApiFiles();
-            _vm.IsSelecting = false;
             RefreshInstanceAfterInstall();
             return;
         }
 
-        LoadInstall.State = new MyLoadingStateSimulator
-        {
-            LoadingState = LoadingState.Error
-        };
-        LoadInstall.TextError = newState == LoadState.Aborted
+        var error = newState == LoadState.Aborted
             ? Lang.Text("Minecraft.Download.Error.InstallationCanceled")
             : loader.Error?.Message ?? Lang.Text("Instance.Install.Error.OperationFailed");
-        CardProgress.IsVisible = true;
         BtnStart.Show = true;
         UpdateActionAvailability();
         OnSelectionChanged();
-        HintService.Show(Hints.Error(LoadInstall.TextError));
+        HintService.Show(Hints.Error(error));
     }
 
     private void RefreshInstanceAfterInstall()
@@ -1176,18 +1235,8 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
 
         try
         {
-            var refreshed = new McInstance(_instanceFolder);
-            _instance = refreshed;
-            LoadCurrentApiInfo(refreshed);
-            UpdateSummary(refreshed);
-            UpdateActionAvailability();
-            _selector.SetMinecraft(
-                refreshed.Info.VanillaName,
-                refreshed.JsonObject?["url"]?.ToString());
-            _selector.ApplyExisting(refreshed);
-            TryResolveExistingLabyMod();
-            TryApplyCurrentApis();
-            ShowSummaryStage();
+            _instance = new McInstance(_instanceFolder);
+            EnterCurrentSelection(false);
         }
         catch (Exception ex)
         {
@@ -1220,17 +1269,6 @@ public partial class PageInstanceInstall : MyPageRight, IRefreshable
         {
             LauncherCommon.Log(ex, "安装完成后刷新实例列表失败");
         }
-    }
-
-    private void RefreshProgressText()
-    {
-        if (!_vm.IsInstalling || _installCombo is null)
-            return;
-        var running = _installCombo
-            .GetLoaderList()
-            .FirstOrDefault(loader => loader.State == LoadState.Loading);
-        _vm.ProgressText = running?.DisplayName ?? Lang.Text("Download.Install.State.Loading");
-        LoadInstall.Text = _vm.ProgressText;
     }
 
     private void RepairFiles()

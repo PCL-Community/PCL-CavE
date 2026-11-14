@@ -10,6 +10,7 @@ namespace PCL.Views.Pages.Download;
 /// </summary>
 public partial class InstallLoaderCard : UserControl
 {
+    private bool? _headerShown;
     public static readonly StyledProperty<string> TitleProperty =
         AvaloniaProperty.Register<InstallLoaderCard, string>(nameof(Title), string.Empty);
 
@@ -57,5 +58,36 @@ public partial class InstallLoaderCard : UserControl
     public void SetBodyMargin(Thickness margin)
     {
         BodyHost.Margin = margin;
+    }
+
+    /// <summary>
+    ///     折叠时显示头部版本，展开时淡出。状态没变则不重复播放。
+    /// </summary>
+    public void SyncCollapsedHeader(bool shown)
+    {
+        if (_headerShown == shown)
+            return;
+        var animate = _headerShown is not null && ContainerAnimation.CanAnimate(this);
+        _headerShown = shown;
+        if (!animate)
+        {
+            HeaderGrid.Opacity = shown ? 1d : 0d;
+            HeaderGrid.RenderTransform = null;
+            return;
+        }
+
+        HeaderGrid.RenderTransform = new global::Avalonia.Media.TranslateTransform();
+        AnimationService.Run(
+            new List<IAnimation>
+            {
+                new OpacityAnimation(HeaderGrid, shown ? 1d : 0d, shown ? 60 : 60),
+                new TranslateYAnimation(
+                    HeaderGrid,
+                    shown ? 0d : 6d,
+                    shown ? 150 : 60,
+                    ease: CubicEaseOut.Shared)
+            },
+            "InstallLoaderCard Header " + GetHashCode(),
+            true);
     }
 }

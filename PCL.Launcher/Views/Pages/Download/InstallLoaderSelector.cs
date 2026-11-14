@@ -63,7 +63,8 @@ internal sealed class InstallLoaderSelection
         || NeoForge is not null
         || FabricVersion is not null
         || LegacyFabricVersion is not null
-        || LabyModCommitRef is not null;
+        || LabyModCommitRef is not null
+        || LabyModVersion is not null;
 
     public void Clear()
     {
@@ -257,7 +258,8 @@ internal sealed class InstallLoaderSelector : IDisposable
     public void SetMinecraft(
         string? minecraftName,
         string? minecraftJsonUrl,
-        bool resetSelection = true)
+        bool resetSelection = true,
+        bool forceRestartLoaders = true)
     {
         var versionChanged = !string.Equals(
             MinecraftName,
@@ -275,7 +277,7 @@ internal sealed class InstallLoaderSelector : IDisposable
         }
 
         EnsureBuilt();
-        StartListLoaders(true);
+        StartListLoaders(forceRestartLoaders);
         RefreshAll();
         NotifyChanged();
     }
@@ -327,7 +329,13 @@ internal sealed class InstallLoaderSelector : IDisposable
     {
         var info = instance.Info;
         Selection.Clear();
-        if (info.HasForge)
+        // 与 WPF GetCurrentInfo 相同：主加载器互斥，OptiFine / LiteLoader 可并存。
+        if (info.HasCleanroom)
+        {
+            Selection.Cleanroom = new GameDownload.DlCleanroomListEntry(info.Cleanroom ?? "");
+        }
+        else if (info.HasForge)
+        {
             Selection.Forge = new GameDownload.DlForgeVersionEntry(
                 info.Forge ?? "",
                 null,
@@ -336,7 +344,22 @@ internal sealed class InstallLoaderSelector : IDisposable
                 Category = "installer",
                 Inherit = info.VanillaName
             };
-        if (info.HasNeoForge)
+        }
+        else if (info.HasLegacyFabric)
+        {
+            Selection.LegacyFabricVersion = info.LegacyFabric;
+        }
+        else if (info.HasFabric)
+        {
+            Selection.FabricVersion = info.Fabric;
+        }
+        else if (info.HasLabyMod)
+        {
+            Selection.LabyModChannel = "production";
+            Selection.LabyModVersion = info.LabyMod;
+            _existingLabyModVersion = info.LabyMod;
+        }
+        else if (info.HasNeoForge)
         {
             var version = info.NeoForge ?? "";
             Selection.NeoForge = new GameDownload.DlNeoForgeListEntry(
@@ -345,29 +368,24 @@ internal sealed class InstallLoaderSelector : IDisposable
                     : version);
         }
 
-        if (info.HasCleanroom)
-            Selection.Cleanroom = new GameDownload.DlCleanroomListEntry(info.Cleanroom ?? "");
-        if (info.HasFabric)
-            Selection.FabricVersion = info.Fabric;
-        if (info.HasLegacyFabric)
-            Selection.LegacyFabricVersion = info.LegacyFabric;
+        if (!info.HasLabyMod)
+            _existingLabyModVersion = null;
+
         if (info.HasOptiFine)
         {
-            var optiFineVersion = info.OptiFine ?? "";
-            if (!optiFineVersion.StartsWith("HD_U", StringComparison.OrdinalIgnoreCase))
-                optiFineVersion = $"HD_U_{optiFineVersion}";
-            var isPreview = optiFineVersion.Contains(
-                "pre",
-                StringComparison.OrdinalIgnoreCase);
+            var raw = info.OptiFine ?? "";
+            var normalized = raw.StartsWith("HD_U", StringComparison.OrdinalIgnoreCase)
+                ? raw
+                : $"HD_U_{raw}";
+            var isPreview = raw.Contains("pre", StringComparison.OrdinalIgnoreCase);
             Selection.OptiFine = new GameDownload.DlOptiFineListEntry
             {
-                DisplayName =
-                    $"{info.VanillaName} {optiFineVersion.Replace("HD_U_", "").Replace("_", " ")}",
+                DisplayName = $"{info.VanillaName} {raw.Replace("_", " ")}",
                 IsPreview = isPreview,
                 Inherit = info.VanillaName,
-                NameVersion = $"{info.VanillaName}-OptiFine_{optiFineVersion}",
+                NameVersion = $"{info.VanillaName}-OptiFine_{normalized}",
                 NameFile =
-                    $"{(isPreview ? "preview_" : "")}OptiFine_{info.VanillaName}_{optiFineVersion}.jar"
+                    $"{(isPreview ? "preview_" : "")}OptiFine_{info.VanillaName}_{normalized}.jar"
             };
         }
 
@@ -376,16 +394,6 @@ internal sealed class InstallLoaderSelector : IDisposable
             {
                 Inherit = info.VanillaName
             };
-        if (info.HasLabyMod)
-        {
-            Selection.LabyModChannel = "production";
-            Selection.LabyModVersion = info.LabyMod;
-            _existingLabyModVersion = info.LabyMod;
-        }
-        else
-        {
-            _existingLabyModVersion = null;
-        }
 
         _autoFabricApi = true;
         _autoLegacyFabricApi = true;
@@ -547,6 +555,7 @@ internal sealed class InstallLoaderSelector : IDisposable
             ?? error
             ?? Lang.Text("Download.Install.State.CanAdd");
         card.Info.Opacity = selected is null ? 0.7d : 1d;
+        card.Host.SyncCollapsedHeader(card.Card.IsSwapped);
         if (!card.Card.IsSwapped)
             BuildBody(card);
     }
