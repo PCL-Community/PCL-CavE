@@ -31,10 +31,15 @@ internal static class SyncHelper
             return;
         }
 
-        while (!task.IsCompleted)
-        {
-            Dispatcher.UIThread.RunJobs(DispatcherPriority.Background);
-            Thread.Sleep(1);
-        }
+        var frame = new DispatcherFrame(exitWhenRequested: false);
+        task.ContinueWith(
+            static (_, state) => ((DispatcherFrame)state!).Continue = false,
+            frame,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+        if (!task.IsCompleted)
+            Dispatcher.UIThread.PushFrame(frame);
     }
 }
