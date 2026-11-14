@@ -12,6 +12,7 @@
         <LangVersion>14.0</LangVersion>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Configurations>Debug;CI;Release;Beta</Configurations>
         <Platforms>AnyCPU;x64;ARM64</Platforms>
         <PlatformTarget>$(Platform)</PlatformTarget>

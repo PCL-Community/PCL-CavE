@@ -10,6 +10,7 @@
                                          BackgroundBrush="{DynamicResource ColorBrush3}"
                                          IsHitTestVisible="False" />
         <Grid x:Name="PanTitleMain"
+              Margin="{OnPlatform Default=0, macOS='56,0,0,0'}"
               ColumnDefinitions="1*,Auto,1*">
             <Grid x:Name="PanTitleLeft"
                   Grid.Column="0"
@@ -110,6 +111,7 @@
             </StackPanel>
         </Grid>
         <Grid x:Name="PanInnerTitle"
+              Margin="{OnPlatform Default=0, macOS='56,0,0,0'}"
               Opacity="0"
               IsVisible="False">
             <controls:MyIconButton x:Name="BtnTitleInner"
@@ -146,6 +148,7 @@
                                    AutomationProperties.Name="{loc:Loc Main.Menu.Help}"
                                    Click="Help_OnClick" />
             <controls:MyIconButton x:Name="BtnTitleMin"
+                                   IsVisible="{OnPlatform True, macOS=False}"
                                    Width="28"
                                    Height="28"
                                    Theme="White"
@@ -153,6 +156,7 @@
                                    AutomationProperties.Name="{loc:Loc Main.Menu.Minimize}"
                                    Click="Minimize_OnClick" />
             <controls:MyIconButton x:Name="BtnTitleClose"
+                                   IsVisible="{OnPlatform True, macOS=False}"
                                    Width="28"
                                    Height="28"
                                    Theme="White"

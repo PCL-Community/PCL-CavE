@@ -13,20 +13,23 @@
         MinWidth="810"
         MinHeight="470"
         WindowStartupLocation="CenterScreen"
-        WindowDecorations="None"
+        WindowDecorations="{OnPlatform None, macOS=Full}"
+        ExtendClientAreaToDecorationsHint="{OnPlatform False, macOS=True}"
+        ExtendClientAreaTitleBarHeightHint="{OnPlatform -1, macOS=48}"
         Background="Transparent"
         CanResize="True"
+        CanMaximize="{OnPlatform True, macOS=False}"
         TransparencyBackgroundFallback="{DynamicResource ColorBrushBackground}"
         Title="Plain Craft Launcher Community Edition ">
     <Grid x:Name="PanRoot"
           Background="Transparent">
-        <ui:MyDropShadow Color="#21000000"
-                         ShadowRadius="10"
-                         CornerRadius="6"
+        <ui:MyDropShadow Color="{OnPlatform Default=#21000000, macOS=Transparent}"
+                         ShadowRadius="{OnPlatform 10, macOS=0}"
+                         CornerRadius="{OnPlatform 6, macOS=0}"
                          CenterTransparent="True">
             <Border x:Name="PanBack"
-                    Margin="10"
-                    CornerRadius="6"
+                    Margin="{OnPlatform 10, macOS=0}"
+                    CornerRadius="{OnPlatform 6, macOS=0}"
                     ClipToBounds="True">
                 <Grid x:Name="PanForm"
                       RowDefinitions="Auto,*">

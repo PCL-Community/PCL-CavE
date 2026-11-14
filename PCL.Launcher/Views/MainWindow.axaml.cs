@@ -37,7 +37,9 @@ public partial class MainWindow : Window
         InitializeComponent();
         Current = this;
         ApplyWindowIcon();
-        TransparencyLevelHint = [WindowTransparencyLevel.Transparent];
+        TransparencyLevelHint = OperatingSystem.IsMacOS()
+            ? [WindowTransparencyLevel.None]
+            : [WindowTransparencyLevel.Transparent];
         _ = new WindowStateStore(this);
         ApplyDebugWindowSize();
 
@@ -56,13 +58,20 @@ public partial class MainWindow : Window
         PageLeftHost.SizeChanged += (_, _) => ScheduleLeftWidthUpdate();
         LocalizationService.LanguageChanged += OnLanguageChangedForLeftWidth;
 
-        ApplyRoundedWindowClip();
-        AddHandler(
-            PointerPressedEvent,
-            OnResizePointerPressed,
-            RoutingStrategies.Tunnel,
-            true);
-        PointerMoved += OnResizePointerMoved;
+        if (OperatingSystem.IsMacOS())
+        {
+            MacOsWindowChrome.Attach(this, _titleBar);
+        }
+        else
+        {
+            ApplyRoundedWindowClip();
+            AddHandler(
+                PointerPressedEvent,
+                OnResizePointerPressed,
+                RoutingStrategies.Tunnel,
+                true);
+            PointerMoved += OnResizePointerMoved;
+        }
 
         Topmost = true;
         Opened += (_, _) => Dispatcher.UIThread.Post(
