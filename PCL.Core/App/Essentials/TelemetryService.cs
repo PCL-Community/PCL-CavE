@@ -16,7 +16,9 @@ using PCL.Core.Utils.OS;
 using PCL.Core.Utils.Secret;
 using Sentry;
 using Sentry.Extensibility;
+#if !X64_MACOS
 using STUN.Client;
+#endif
 
 namespace PCL.Core.App.Essentials;
 
@@ -151,6 +153,7 @@ public sealed partial class TelemetryService
 
         var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 
+#if !X64_MACOS
         // stun test
         StunClient5389UDP? natTest = null;
         var miWifiIps =
@@ -171,6 +174,7 @@ public sealed partial class TelemetryService
                 new IPEndPoint(IPAddress.Any, 0));
             await natTest.QueryAsync().ConfigureAwait(false);
         }
+#endif
 
         var telemetry = new TelemetryDeviceEnvironment
         {
@@ -192,8 +196,13 @@ public sealed partial class TelemetryService
             UsedHmcl = Directory.Exists(Path.Combine(appDataFolder, ".hmcl")),
             UsedBakaXl = Directory.Exists(Path.Combine(appDataFolder, "BakaXL")),
             Memory = _GetPhysicalMemoryBytes(),
+#if !X64_MACOS
             NatMapBehaviour = natTest?.State.MappingBehavior.ToString(),
             NatFilterBehaviour = natTest?.State.FilteringBehavior.ToString(),
+#else
+            NatMapBehaviour = null,
+            NatFilterBehaviour = null,
+#endif
             Ipv6Status = NetworkInterfaceUtils.GetIPv6Status().ToString()
         };
 
