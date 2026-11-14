@@ -29,10 +29,6 @@
         <NoWarn>$(NoWarn);CS9113</NoWarn>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64'">
-        <DefineConstants>$(DefineConstants);X64_MACOS</DefineConstants>
-    </PropertyGroup>
-
     <!-- 构建配置 -->
     <PropertyGroup Condition="'$(Configuration)' == 'Debug' Or '$(Configuration)' == 'CI' Or '$(Configuration)' == 'DebugCI'">
         <DebugSymbols>true</DebugSymbols>
@@ -46,6 +42,9 @@
         <Optimize>true</Optimize>
         <DefineConstants Condition="'$(Configuration)' == 'Release' Or '$(Configuration)' == 'Publish'">RELEASE;PUBLISH</DefineConstants>
         <DefineConstants Condition="'$(Configuration)' == 'Beta'">BETA;PUBLISH</DefineConstants>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'osx-x64'">
+        <DefineConstants>$(DefineConstants);X64_MACOS</DefineConstants>
     </PropertyGroup>
     <!-- NuGet 引用 -->
     <ItemGroup>
