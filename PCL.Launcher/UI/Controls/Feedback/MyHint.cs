@@ -56,8 +56,7 @@ public class MyHint : Border
             Name = "LabText",
             IsHitTestVisible = false,
             LineHeight = 16d,
-            Margin = new Thickness(0d, 0d, 0d, -1d),
-            Padding = new Thickness(12d, 9d),
+            Padding = new Thickness(12d, 6d, 12d, 12d),
             VerticalAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.Wrap
         };
