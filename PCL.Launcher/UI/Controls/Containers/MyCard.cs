@@ -214,6 +214,7 @@ public class MyCard : Grid
             // 取消由高度变化被迫触发的高度动画
             AnimationService.CancelAnimationByName(HeightAnimationKey);
             _isHeightAnimating = false;
+            ApplyLayoutClip();
         }
     }
 
@@ -258,6 +259,7 @@ public class MyCard : Grid
         Height = IsSwapped ? SwapedHeight : double.NaN;
         AnimationService.CancelAnimationByName(HeightAnimationKey);
         _isHeightAnimating = false;
+        ApplyLayoutClip();
     }
 
     #region 高度改变动画
@@ -287,7 +289,7 @@ public class MyCard : Grid
     /// </summary>
     /// <param name="delta">高度变化量。</param>
     /// <param name="previousHeight">之前的高度。</param>
-    private void StartHeightAnimation(double delta, double previousHeight)
+    private void StartHeightAnimation(double delta, double previousHeight, double? endHeight = null)
     {
         if (_isHeightAnimating || !ContainerAnimation.CanAnimate(this))
             return;
@@ -356,14 +358,43 @@ public class MyCard : Grid
                 {
                     _isHeightAnimating = false;
                     Height = _actualUsedHeight;
+                    ApplyLayoutClip();
                     if (IsSwapped && SwapControl is not null)
                         SwapControl.IsVisible = false;
                 },
-                true));
-        AnimationService.Run(animList, HeightAnimationKey);
+                after: true));
         _isHeightAnimating = true;
-        _actualUsedHeight = IsSwapped ? SwapedHeight : Height;
+        _actualUsedHeight = endHeight ?? (IsSwapped ? SwapedHeight : Height);
         Height = previousHeight;
+        ApplyLayoutClip();
+        AnimationService.Run(animList, HeightAnimationKey);
+    }
+
+    private void ApplyLayoutClip()
+    {
+        // 只在高度动画期间裁。折叠静止时内容已隐藏，阴影仍要画出卡片外。
+        var clip = _isHeightAnimating && !double.IsNaN(Height);
+        if (ClipToBounds != clip)
+            ClipToBounds = clip;
+    }
+
+    private double MeasureExpandedHeight()
+    {
+        var width = Bounds.Width > 0d ? Bounds.Width : double.PositiveInfinity;
+        var savedHeight = Height;
+        var savedAnimating = _isHeightAnimating;
+        _isHeightAnimating = true;
+        try
+        {
+            Height = double.NaN;
+            Measure(new Size(width, double.PositiveInfinity));
+            return Math.Max(DesiredSize.Height, SwapedHeight);
+        }
+        finally
+        {
+            Height = savedHeight;
+            _isHeightAnimating = savedAnimating;
+        }
     }
 
     #endregion
@@ -472,44 +503,27 @@ public class MyCard : Grid
             return;
         }
 
-        if (value)
+        // 展开和收起都先露出内容，再按原来的分段高度动画从当前高度走到目标高度。
+        // 动画期间 Height 保持显式值，ApplyLayoutClip 会把内容裁在卡片里。
+        AnimationService.CancelAnimationByName(HeightAnimationKey);
+        _isHeightAnimating = false;
+        ApplyLayoutClip();
+        SwapControl.IsVisible = true;
+        if (!UseAnimation || !ContainerAnimation.CanAnimate(this))
         {
-            // 折叠时先保留内容，让高度动画可见，动画结束后再隐藏。
-            SwapControl.IsVisible = true;
-            var start = Bounds.Height > 0d ? Bounds.Height : SwapedHeight;
-            if (ContainerAnimation.CanAnimate(this) && start > SwapedHeight)
-            {
-                _isHeightAnimating = true;
-                Height = start;
-                AnimationService.Run(
-                    new List<IAnimation>
-                    {
-                        new HeightAnimation(
-                            this,
-                            SwapedHeight - start,
-                            200,
-                            ease: new FluentEaseOut(EasePower.ExtraStrong)),
-                        new ActionAnimation(
-                            () =>
-                            {
-                                _isHeightAnimating = false;
-                                Height = SwapedHeight;
-                                if (IsSwapped) SwapControl.IsVisible = false;
-                            },
-                            true)
-                    },
-                    HeightAnimationKey);
-            }
-            else
-            {
-                SwapControl.IsVisible = false;
-                Height = SwapedHeight;
-            }
+            SwapControl.IsVisible = !value;
+            TriggerForceResize();
         }
         else
         {
-            SwapControl.IsVisible = true;
-            TriggerForceResize();
+            var start = Bounds.Height > 0d ? Bounds.Height : SwapedHeight;
+            if (value)
+                StartHeightAnimation(SwapedHeight - start, start, SwapedHeight);
+            else
+            {
+                var full = MeasureExpandedHeight();
+                StartHeightAnimation(full - start, start, double.NaN);
+            }
         }
 
         // 根据折叠状态旋转箭头图标：折叠时指向右侧或向上（根据 SwapLogoRight 设置），展开时指向下方
@@ -670,6 +684,7 @@ public class MyCard : Grid
 
         AnimationService.CancelAnimationByName(HeightAnimationKey);
         _isHeightAnimating = false;
+        ApplyLayoutClip();
 
         AnimationService.DisposeControl(
             this,
@@ -713,6 +728,8 @@ public class MyCard : Grid
             _ApplyBackgroundBrush(change.NewValue as IBrush);
         else if (change.Property == IsSwappedProperty && change.NewValue is bool isSwapped)
             _ApplyIsSwapped(isSwapped);
+        else if (change.Property == HeightProperty)
+            ApplyLayoutClip();
     }
 
     private void _OnActualThemeVariantChanged(object? sender, EventArgs e)
