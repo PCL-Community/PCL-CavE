@@ -3062,7 +3062,6 @@
     <sys:String x:Key="Setup.Ui.Basic.LockWindow">鎖定啟動器大小</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Opacity">不透明度</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Opacity2">不透明度</sys:String>
-    <sys:String x:Key="Setup.Ui.Basic.ShowLogo">開啟啟動器時顯示 PCL CE 圖示</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.ShowTriviaHint">在啟動遊戲時顯示"你知道嗎"</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Title">基礎</sys:String>
 
@@ -3612,7 +3611,6 @@
 
     <sys:String x:Key="Tools.Test.Dependency.MissingTitle">缺少依賴</sys:String>
     <sys:String x:Key="Instance.Export.Task.Prefix">匯出實例</sys:String>
-    <sys:String x:Key="Application.Loading.Status.Preparing">Preparing</sys:String>
     <sys:String x:Key="Download.Feature.Migrating">Migrating</sys:String>
     <sys:String x:Key="Download.Feature.Migrating.Description">Migrating download data, please wait.</sys:String>
     <sys:String x:Key="Download.Install.Finished">Installation finished</sys:String>

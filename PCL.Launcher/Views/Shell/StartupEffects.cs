@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Interactivity;
 using Avalonia.Media;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
@@ -58,23 +57,19 @@ public sealed class StartupEffects(
 
     private void PrepareWindowAnimation()
     {
+        window.IsHitTestVisible = true;
+
         var target = WindowTargetOpacity;
-        if (window.Content is not Control root || !AnimationService.IsEnabled)
+        if (window.Content is not Control root)
         {
             window.Opacity = target;
             return;
         }
 
-        if (!root.IsLoaded)
+        root.Opacity = 1d;
+        if (!AnimationService.IsEnabled)
         {
-            void OnLoaded(object? sender, RoutedEventArgs e)
-            {
-                root.Loaded -= OnLoaded;
-                PrepareWindowAnimation();
-            }
-
-            root.Loaded += OnLoaded;
-            window.Opacity = 0d;
+            window.Opacity = target;
             return;
         }
 
@@ -90,19 +85,17 @@ public sealed class StartupEffects(
         AnimationService.Run(
             new List<IAnimation>
             {
-                new OpacityAnimation(window, target, 250, 100),
+                new OpacityAnimation(window, target, 250),
                 new DoubleAnimation(
                     value => translate.Y += value,
                     -translate.Y,
                     600,
-                    100,
-                    new BackEaseWithPowerOut(EasePower.Weak)),
+                    ease: new BackEaseWithPowerOut(EasePower.Weak)),
                 new DoubleAnimation(
                     value => rotate.Angle += value,
                     -rotate.Angle,
                     500,
-                    100,
-                    new BackEaseWithPowerOut(EasePower.Weak)),
+                    ease: new BackEaseWithPowerOut(EasePower.Weak)),
                 new ActionAnimation(
                     () =>
                     {

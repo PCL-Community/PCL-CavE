@@ -24,9 +24,5 @@ internal static partial class UiFramePump
     private static void DiagTickEnd(long tickStamp)
     {
     }
-
-    private static void DiagResetVisible()
-    {
-    }
 }
 #endif

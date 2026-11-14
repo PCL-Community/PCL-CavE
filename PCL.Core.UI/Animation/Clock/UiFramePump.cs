@@ -42,12 +42,6 @@ internal static partial class UiFramePump
 
     public static bool IsRunning { get; private set; }
 
-    /// <summary>窗口正式可见时重置诊断窗口，避免把启动画面遮挡期间的布局算进首屏长帧。</summary>
-    internal static void ResetVisibleDiagnostics()
-    {
-        DiagResetVisible();
-    }
-
     public static void Subscribe(AvaloniaRenderingClock clock)
     {
         lock (SyncRoot)

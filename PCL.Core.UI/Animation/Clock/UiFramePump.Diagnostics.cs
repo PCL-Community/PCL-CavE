@@ -91,17 +91,5 @@ internal static partial class UiFramePump
         _statMaxTickMs = 0d;
         _statSlowTicks = 0;
     }
-
-    private static void DiagResetVisible()
-    {
-        _statStartStamp = Stopwatch.GetTimestamp();
-        _statTicks = 0;
-        _statRafCalls = 0;
-        _statTimerCalls = 0;
-        _statSlowTicks = 0;
-        _statMaxIntervalMs = 0d;
-        _statMaxTickMs = 0d;
-        _lastTickStamp = 0;
-    }
 }
 #endif

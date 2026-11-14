@@ -61,11 +61,6 @@ public sealed class AnimationService : GeneralService
     public static IUiAccessProvider UiAccessProvider =>
         _uiAccessProvider ??= new AvaloniaUiAccessProvider();
 
-    public static void ResetVisibleDiagnostics()
-    {
-        UiFramePump.ResetVisibleDiagnostics();
-    }
-
     public static double MapSpeedValue(int value)
     {
         if (value <= 0) return 0d;

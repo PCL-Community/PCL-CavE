@@ -3130,7 +3130,6 @@
     <sys:String x:Key="Setup.Ui.Basic.LockWindow">锁定启动器大小</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Opacity">不透明度</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Opacity2">不透明度</sys:String>
-    <sys:String x:Key="Setup.Ui.Basic.ShowLogo">打开启动器时显示 PCL CE 图标</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.ShowTriviaHint">在启动游戏时显示"你知道吗"</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Title">基础</sys:String>
 
@@ -3682,7 +3681,6 @@
 
     <sys:String x:Key="Tools.Test.Dependency.MissingTitle">缺少依赖</sys:String>
     <sys:String x:Key="Instance.Export.Task.Prefix">导出实例</sys:String>
-    <sys:String x:Key="Application.Loading.Status.Preparing">准备中</sys:String>
     <sys:String x:Key="Download.Feature.Migrating">正在迁移</sys:String>
     <sys:String x:Key="Download.Feature.Migrating.Description">正在迁移下载数据，请稍候。</sys:String>
     <sys:String x:Key="Download.Install.Finished">安装完成</sys:String>

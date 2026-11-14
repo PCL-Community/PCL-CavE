@@ -70,8 +70,6 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
             ViewModel.CustomNetText = TextCustomNet.Text ?? string.Empty;
         });
 
-        CheckLauncherLogo.Change += (_, _) => WriteIfReady(() =>
-            Config.Preference.ShowStartupLogo = CheckLauncherLogo.Checked == true);
         CheckLockWindowSize.Change += (_, _) => WriteIfReady(() =>
             Config.Preference.LockWindowSize = CheckLockWindowSize.Checked == true);
         CheckShowLaunchingHint.Change += (_, _) => WriteIfReady(() =>
@@ -241,7 +239,6 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         try
         {
             ViewModel.Reload(Math.Max(1, ComboLightColor.ItemCount));
-            CheckLauncherLogo.Checked = Config.Preference.ShowStartupLogo;
             CheckLockWindowSize.Checked = Config.Preference.LockWindowSize;
             CheckShowLaunchingHint.Checked = Config.Preference.ShowLaunchingHint;
 

@@ -97,10 +97,6 @@
                                        SelectedIndex="{Binding DarkColorSelectedIndex, Mode=TwoWay}" />
                     </Grid>
 
-                    <ui:MyCheckBox x:Name="CheckLauncherLogo"
-                                   Height="22"
-                                   Margin="-1,0,0,7"
-                                   Text="{loc:Loc Setup.Ui.Basic.ShowLogo}" />
                     <ui:MyCheckBox x:Name="CheckLockWindowSize"
                                    Height="22"
                                    Margin="-1,0,0,7"
