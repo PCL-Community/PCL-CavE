@@ -227,7 +227,7 @@ public partial class MyIconTextButton : Border
             this,
             BackgroundProperty,
             background ?? string.Empty,
-            background is null ? new NColor(Colors.Transparent) : null,
+            background is null ? (NColor?)new NColor(Colors.Transparent) : null,
             time,
             animate,
             BackgroundKey);

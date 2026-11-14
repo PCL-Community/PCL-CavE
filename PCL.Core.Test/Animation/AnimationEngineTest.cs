@@ -1,5 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using PCL.Core.UI.Animation;
 using PCL.Core.UI.Animation.Animatable;
@@ -211,6 +215,113 @@ public sealed class AnimationEngineTest
                 3
             },
             calls);
+    }
+
+    [TestMethod]
+    public void ElasticEaseOutMatchesLegacyCurve()
+    {
+        var ease = new ElasticEaseOut(EasePower.Weak);
+
+        Assert.AreEqual(0d, ease.Ease(0d), 1e-6d);
+        Assert.AreEqual(0.6122377311846043d, ease.Ease(0.25d), 1e-6d);
+        Assert.AreEqual(1.3927820463649314d, ease.Ease(0.5d), 1e-6d);
+        Assert.AreEqual(0.9329678868688169d, ease.Ease(0.75d), 1e-6d);
+        Assert.AreEqual(1d, ease.Ease(1d), 1e-6d);
+    }
+
+    [TestMethod]
+    public void ScaleTransformAnimationResetsOriginToCenter()
+    {
+        var border = new Border
+        {
+            RenderTransformOrigin = RelativePoint.TopLeft,
+            RenderTransform = new ScaleTransform(1d, 1d)
+        };
+
+        _ = new ScaleTransformAnimation(border, -0.1d, 1000);
+
+        Assert.AreEqual(RelativePoint.Center, border.RenderTransformOrigin);
+    }
+
+    [TestMethod]
+    public void CallbackAnimationReceivesFrameDeltas()
+    {
+        var deltas = new List<double>();
+        var animation = new DoubleAnimation(delta => deltas.Add(delta), -10d, 1000);
+        var target = animation.Target!;
+
+        animation.PrepareForTest(target);
+        for (var frameIndex = 0; frameIndex < animation.TotalFrames; frameIndex++)
+        {
+            animation.CurrentFrame = frameIndex;
+            var frame = animation.ComputeNextFrame(target);
+            Assert.IsNotNull(frame);
+            frame.GetAction()();
+        }
+
+        Assert.AreEqual(-10d, deltas.Sum(), 1e-6d);
+        Assert.IsTrue(deltas.All(delta => delta <= 1e-9d));
+    }
+
+    [TestMethod]
+    public void ParallelRelativeAnimationsCompose()
+    {
+        var owner = new NumberOwner();
+        var target = CreateTarget(owner);
+        var first = new DoubleFromToAnimation
+        {
+            To = 5d,
+            ValueType = AnimationValueType.Relative,
+            Duration = TimeSpan.FromSeconds(1d),
+            Easing = new LinearEasing()
+        };
+        var second = new DoubleFromToAnimation
+        {
+            To = 11d,
+            ValueType = AnimationValueType.Relative,
+            Duration = TimeSpan.FromSeconds(1d),
+            Easing = new LinearEasing()
+        };
+
+        first.PrepareForTest(target);
+        second.PrepareForTest(target);
+
+        for (var frameIndex = 0; frameIndex < first.TotalFrames; frameIndex++)
+        {
+            first.CurrentFrame = frameIndex;
+            first.ComputeNextFrame(target)!.GetAction()();
+
+            second.CurrentFrame = frameIndex;
+            second.ComputeNextFrame(target)!.GetAction()();
+        }
+
+        Assert.AreEqual(16d, owner.Value, 1e-6d);
+    }
+
+    [TestMethod]
+    public void TranslateYAnimationsCompose()
+    {
+        var border = new Border
+        {
+            RenderTransform = new TranslateTransform(0d, -16d)
+        };
+        var first = new TranslateYAnimation(border, 5d, 1000);
+        var second = new TranslateYAnimation(border, 11d, 1000);
+
+        first.PrepareForTest(first.Target!);
+        second.PrepareForTest(second.Target!);
+
+        for (var frameIndex = 0; frameIndex < first.TotalFrames; frameIndex++)
+        {
+            first.CurrentFrame = frameIndex;
+            first.ComputeNextFrame(first.Target!)!.GetAction()();
+
+            second.CurrentFrame = frameIndex;
+            second.ComputeNextFrame(second.Target!)!.GetAction()();
+        }
+
+        var transform = (TranslateTransform)border.RenderTransform!;
+        Assert.AreEqual(0d, transform.Y, 1e-6d);
     }
 
     private sealed class NumberOwner

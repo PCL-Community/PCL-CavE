@@ -99,6 +99,7 @@ internal static class ButtonAnimation
     /// <summary>直接设置控件缩放，供动画关闭时立即落到终值。</summary>
     internal static void SetScale(Visual visual, double scale)
     {
+        visual.RenderTransformOrigin = RelativePoint.Center;
         if (visual.RenderTransform is ScaleTransform transform)
         {
             transform.ScaleX = scale;
@@ -106,7 +107,6 @@ internal static class ButtonAnimation
             return;
         }
 
-        visual.RenderTransformOrigin = RelativePoint.Center;
         visual.RenderTransform = new ScaleTransform(scale, scale);
     }
 
@@ -129,6 +129,7 @@ internal static class ButtonAnimation
         if (Math.Abs(delta) < 0.0001d)
             return;
 
+        control.RenderTransformOrigin = RelativePoint.Center;
         AnimationService.Run(
             new ScaleTransformAnimation(control, delta, time, delay, ease),
             name);

@@ -258,8 +258,8 @@ public partial class MyIconButton : Border
             {
                 Themes.White => (string.Empty, new NColor(234d, 242d, 254d)),
                 Themes.Black => (string.Empty, ThemeService.IsDarkMode
-                    ? new NColor(IsPointerOver ? 230d : 160d, 255d, 255d)
-                    : new NColor(IsPointerOver ? 230d : 160d, 0d, 0d, 0d)),
+                    ? new NColor(255d, 255d, 255d, IsPointerOver ? 230d : 160d)
+                    : new NColor(0d, 0d, 0d, IsPointerOver ? 230d : 160d)),
                 Themes.Red => IsPointerOver
                     ? ("ColorBrushRedLight", null)
                     : ("ColorBrushRedLight", AlphaThemeColor("ColorBrushRedLight", 160d)),
@@ -301,7 +301,7 @@ public partial class MyIconButton : Border
                 PanBack,
                 BackgroundProperty,
                 string.Empty,
-                new NColor(50d, 255d, 255d),
+                new NColor(255d, 255d, 255d, 50d),
                 time,
                 animate,
                 BackgroundKey);
@@ -312,7 +312,7 @@ public partial class MyIconButton : Border
             PanBack,
             BackgroundProperty,
             string.Empty,
-            new NColor(0d, 255d, 255d),
+            new NColor(255d, 255d, 255d, 0d),
             time,
             animate,
             BackgroundKey);

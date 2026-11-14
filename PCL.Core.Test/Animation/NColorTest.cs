@@ -135,6 +135,26 @@ public sealed class NColorTest
     }
 
     [TestMethod]
+    public void FromArgbUsesAlphaFirstOrder()
+    {
+        var color = NColor.FromArgb(50d, 255d, 255d, 255d).ToColor();
+
+        Assert.AreEqual(255, color.R);
+        Assert.AreEqual(255, color.G);
+        Assert.AreEqual(255, color.B);
+        Assert.AreEqual(50, color.A);
+    }
+
+    [TestMethod]
+    public void NullSolidColorBrushIsTransparent()
+    {
+        SolidColorBrush? brush = null;
+        NColor color = brush;
+
+        Assert.AreEqual(0, color.ToColor().A);
+    }
+
+    [TestMethod]
     public void ArithmeticKeepsSrgbSemantics()
     {
         var midpoint = (new NColor(255, 255, 255) - new NColor(0, 0, 0)) * 0.5f;

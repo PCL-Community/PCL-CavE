@@ -141,15 +141,18 @@ public struct NColor
     {
     }
 
-    public NColor(SolidColorBrush brush) : this(brush.Color)
+    public NColor(SolidColorBrush? brush) : this(brush?.Color ?? Colors.Transparent)
     {
     }
 
-    public NColor(IBrush brush)
+    public NColor(IBrush? brush)
     {
-        _scRgb = brush is ISolidColorBrush solid
-            ? _ToScRgb(solid.Color)
-            : throw new ArgumentException("只支持纯色画刷。", nameof(brush));
+        _scRgb = brush switch
+        {
+            null => new Vector4(0f, 0f, 0f, 0f),
+            ISolidColorBrush solid => _ToScRgb(solid.Color),
+            _ => throw new ArgumentException("只支持纯色画刷。", nameof(brush))
+        };
     }
 
     /// <summary>直接使用 scRGB 线性分量构造，X/Y/Z 为线性 RGB，W 为 0-255 alpha。</summary>
@@ -213,6 +216,22 @@ public struct NColor
     #endregion
 
     #region 颜色空间转换
+
+    /// <summary>
+    ///     按 alpha-first 顺序构造颜色，和旧 <c>MyColor(a, r, g, b)</c> 的参数顺序一致。
+    /// </summary>
+    public static NColor FromArgb(float a, float r, float g, float b)
+    {
+        return new NColor(r, g, b, a);
+    }
+
+    /// <summary>
+    ///     按 alpha-first 顺序构造颜色，和旧 <c>MyColor(a, r, g, b)</c> 的参数顺序一致。
+    /// </summary>
+    public static NColor FromArgb(double a, double r, double g, double b)
+    {
+        return new NColor((float)r, (float)g, (float)b, (float)a);
+    }
 
     /// <summary>从 scRGB 线性分量构造颜色，alpha 范围 0-1。</summary>
     public static NColor FromScRgb(
@@ -618,7 +637,7 @@ public struct NColor
         return new NColor(color);
     }
 
-    public static implicit operator NColor(SolidColorBrush brush)
+    public static implicit operator NColor(SolidColorBrush? brush)
     {
         return new NColor(brush);
     }

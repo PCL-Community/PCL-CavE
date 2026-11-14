@@ -459,7 +459,9 @@ public sealed class DialogPresenter : IDialogPresenter
 
         AnimationService.CancelAnimationByName(MaskAnimationKey);
         var target = show
-            ? warn ? new NColor(140d, 80d, 0d, 0d) : new NColor(90d, 0d, 0d, 0d)
+            ? warn
+                ? new NColor(80d, 0d, 0d, 140d)
+                : new NColor(0d, 0d, 0d, 90d)
             : new NColor(0d, 0d, 0d, 0d);
         var duration = _GetFadeDuration(200);
 

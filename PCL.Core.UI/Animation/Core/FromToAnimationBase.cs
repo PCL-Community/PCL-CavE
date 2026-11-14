@@ -8,6 +8,8 @@ public class FromToAnimationBase<T> : AnimationBase, IFromToAnimation
 {
     private int _currentFrame;
 
+    private bool _hasPreviousValue;
+    private T? _previousValue;
     private T? _startValue;
     public IEasing Easing { get; set; } = new LinearEasing();
     public T From { get; set; } = default!;
@@ -81,14 +83,22 @@ public class FromToAnimationBase<T> : AnimationBase, IFromToAnimation
     public override IAnimationFrame? ComputeNextFrame(IAnimatable target)
     {
         if (_currentFrame < TotalFrames)
-            return new FromToAnimationFrame<T>
+        {
+            if (ValueType == AnimationValueType.Relative)
             {
-                Target = target,
-                Value = ValueType == AnimationValueType.Relative
-                    ? CurrentValue!
-                    : ValueProcessorManager.Subtract(CurrentValue!, From!),
-                StartValue = ValueType == AnimationValueType.Relative ? _startValue! : From!
-            };
+                var current = CurrentValue!;
+                var previous = _hasPreviousValue ? _previousValue! : From!;
+                var delta = ValueProcessorManager.Subtract(current, previous);
+                _previousValue = current;
+                _hasPreviousValue = true;
+                return new FromToAnimationFrame<T>(target, delta, default!, true);
+            }
+
+            return new FromToAnimationFrame<T>(
+                target,
+                ValueProcessorManager.Subtract(CurrentValue!, From!),
+                From!);
+        }
 
         Status = AnimationStatus.Completed;
         return null;
@@ -144,8 +154,10 @@ public class FromToAnimationBase<T> : AnimationBase, IFromToAnimation
 
     private void _RunCore(IAnimatable target)
     {
-        // 重置当前帧
+        // 重置当前帧与相对动画的上一帧状态
         _currentFrame = 0;
+        _hasPreviousValue = false;
+        _previousValue = default;
 
         // 空值检查
         ArgumentNullException.ThrowIfNull(To);

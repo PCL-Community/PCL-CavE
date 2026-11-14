@@ -60,62 +60,57 @@ internal static class AnimationTargets
         if (target is not Control control)
             return EmptyAnimatable.Instance;
 
-        var startWidth = EffectiveWidth(control);
-        var startHeight = EffectiveHeight(control);
-        var startMargin = control.Margin;
-        var deltaWidth = absolute ? value : startWidth * value;
-        var deltaHeight = absolute ? value : startHeight * value;
+        var deltaWidth = absolute ? value : EffectiveWidth(control) * value;
+        var deltaHeight = absolute ? value : EffectiveHeight(control) * value;
 
         return new RelayAnimatable(
             () => 0d,
-            percent =>
+            percentDelta =>
             {
-                var offsetX = -0.5d * deltaWidth * percent;
-                var offsetY = -0.5d * deltaHeight * percent;
-                control.Width = Math.Max(0d, startWidth + deltaWidth * percent);
-                control.Height = Math.Max(0d, startHeight + deltaHeight * percent);
+                var offsetX = -0.5d * deltaWidth * percentDelta;
+                var offsetY = -0.5d * deltaHeight * percentDelta;
+                control.Width = Math.Max(0d, EffectiveWidth(control) + deltaWidth * percentDelta);
+                control.Height = Math.Max(
+                    0d,
+                    EffectiveHeight(control) + deltaHeight * percentDelta);
+                var margin = control.Margin;
                 control.Margin = new Thickness(
-                    startMargin.Left + offsetX,
-                    startMargin.Top + offsetY,
-                    startMargin.Right + offsetX,
-                    startMargin.Bottom + offsetY);
+                    margin.Left + offsetX,
+                    margin.Top + offsetY,
+                    margin.Right + offsetX,
+                    margin.Bottom + offsetY);
             });
     }
 
     public static IAnimatable ScaleTransform(Visual visual)
     {
+        visual.RenderTransformOrigin = RelativePoint.Center;
         var transform = EnsureScale(visual);
-        var start = transform.ScaleX;
         return new RelayAnimatable(
             () => 0d,
-            value =>
+            delta =>
             {
-                transform.ScaleX = Math.Max(0d, start + value);
-                transform.ScaleY = Math.Max(0d, start + value);
+                transform.ScaleX = Math.Max(0d, transform.ScaleX + delta);
+                transform.ScaleY = Math.Max(0d, transform.ScaleY + delta);
             });
     }
 
     public static IAnimatable RotateTransform(Visual visual)
     {
         var transform = EnsureRotate(visual);
-        var start = transform.Angle;
-        return new RelayAnimatable(
-            () => 0d,
-            value => transform.Angle = start + value);
+        return new RelayAnimatable(() => 0d, delta => transform.Angle += delta);
     }
 
     public static IAnimatable TranslateX(Visual visual)
     {
         var transform = EnsureTranslate(visual);
-        var start = transform.X;
-        return new RelayAnimatable(() => 0d, value => transform.X = start + value);
+        return new RelayAnimatable(() => 0d, delta => transform.X += delta);
     }
 
     public static IAnimatable TranslateY(Visual visual)
     {
         var transform = EnsureTranslate(visual);
-        var start = transform.Y;
-        return new RelayAnimatable(() => 0d, value => transform.Y = start + value);
+        return new RelayAnimatable(() => 0d, delta => transform.Y += delta);
     }
 
     public static IAnimatable GridLength(ColumnDefinition column)
