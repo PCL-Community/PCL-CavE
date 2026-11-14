@@ -65,22 +65,18 @@ public class MyCard : Grid
 
     public MyCard()
     {
-        MainChrome = new MyDropShadow
+        MainChrome = new CardShadow
         {
-            Margin = new Thickness(-3d, -3d, -3d, -4d),
-            ShadowRadius = 3d,
             CornerRadius = new CornerRadius(5d),
-            CenterTransparent = true,
+            ShadowBlur = 3d,
             Opacity = DropShadowIdleOpacity,
             IsHitTestVisible = false
         };
-        ContainerTheme.BindDynamic(MainChrome, MyDropShadow.ColorProperty, "ColorObject1");
+        ContainerTheme.BindDynamic(MainChrome, CardShadow.ColorProperty, "ColorObject1");
         Children.Insert(0, MainChrome);
         _mainBorder = new BlurBorder
         {
             CornerRadius = new CornerRadius(5d),
-            // BorderChild 是页面内容的宿主；必须让内容参与命中测试，
-            // 否则所有通过 BorderChild 挂载的按钮/输入框都会变成不可点击。
             IsHitTestVisible = true
         };
         Children.Insert(1, _mainBorder);
@@ -95,7 +91,7 @@ public class MyCard : Grid
         PointerReleased += _OnPointerReleased;
     }
 
-    public MyDropShadow MainChrome { get; }
+    public CardShadow MainChrome { get; }
 
     public Control? BorderChild
     {
@@ -220,8 +216,7 @@ public class MyCard : Grid
 
     public void StackInstall()
     {
-        var stack = SwapControl as StackPanel;
-        if (stack is null)
+        if (SwapControl is not StackPanel stack)
             return;
 
         StackInstall(ref stack, InstallMethod);
@@ -362,7 +357,7 @@ public class MyCard : Grid
                     if (IsSwapped && SwapControl is not null)
                         SwapControl.IsVisible = false;
                 },
-                after: true));
+                true));
         _isHeightAnimating = true;
         _actualUsedHeight = endHeight ?? (IsSwapped ? SwapedHeight : Height);
         Height = previousHeight;
@@ -518,7 +513,9 @@ public class MyCard : Grid
         {
             var start = Bounds.Height > 0d ? Bounds.Height : SwapedHeight;
             if (value)
+            {
                 StartHeightAnimation(SwapedHeight - start, start, SwapedHeight);
+            }
             else
             {
                 var full = MeasureExpandedHeight();
@@ -848,7 +845,7 @@ public class MyCard : Grid
         if (!ContainerAnimation.CanAnimate(this) || !this.TryFindResource(colorKey, out _))
         {
             AnimationService.CancelAnimationByName(MouseAnimationKey);
-            ContainerTheme.BindDynamic(MainChrome, MyDropShadow.ColorProperty, colorKey);
+            ContainerTheme.BindDynamic(MainChrome, CardShadow.ColorProperty, colorKey);
             MainChrome.Opacity = targetOpacity;
             return;
         }
@@ -858,7 +855,7 @@ public class MyCard : Grid
             {
                 new ColorAnimation(
                     MainChrome,
-                    MyDropShadow.ColorProperty,
+                    CardShadow.ColorProperty,
                     colorKey,
                     ShadowColorTime),
                 new OpacityAnimation(
