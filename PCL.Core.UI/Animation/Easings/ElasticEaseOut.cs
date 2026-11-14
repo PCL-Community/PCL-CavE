@@ -2,6 +2,11 @@ namespace PCL.Core.UI.Animation.Easings;
 
 public class ElasticEaseOut : Easing
 {
+    public ElasticEaseOut(EasePower power = EasePower.Middle)
+    {
+        _ = power;
+    }
+
     public static ElasticEaseOut Shared { get; } = new();
 
     protected override double EaseCore(double progress)

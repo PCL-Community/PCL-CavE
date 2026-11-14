@@ -60,6 +60,15 @@ public struct NColor
         _color = new Vector4(r, g, b, a);
     }
 
+    public NColor(
+        double r,
+        double g,
+        double b,
+        double a = 255d)
+        : this((float)r, (float)g, (float)b, (float)a)
+    {
+    }
+
     public NColor(Color color) : this(color.R, color.G, color.B, color.A)
     {
     }
@@ -130,6 +139,15 @@ public struct NColor
     }
 
     public NColor(float a, NColor color) : this(color.R, color.G, color.B, a)
+    {
+    }
+
+    public NColor(double a, NColor color) : this((float)a, color)
+    {
+    }
+
+    public NColor(double a, Color color)
+        : this(color.R, color.G, color.B, (float)a)
     {
     }
 
@@ -300,6 +318,46 @@ public struct NColor
             < 0.66667 => v1 + (v2 - v1) * (4 - vH * 6),
             _ => v1
         };
+    }
+
+    public static NColor FromHsl2(double sH, double sS, double sL)
+    {
+        if (sS == 0d)
+        {
+            var gray = new NColor
+            {
+                R = (float)(sL * 2.55d),
+                A = 255f
+            };
+            gray.G = gray.R;
+            gray.B = gray.R;
+            return gray;
+        }
+
+        sH = (sH + 3600000d) % 360d;
+        double[] cent =
+        [
+            +0.1d, -0.06d, -0.3d, -0.19d, -0.15d, -0.24d, -0.32d,
+            -0.09d, +0.18d, +0.05d, -0.12d, -0.02d, +0.1d, -0.06d
+        ];
+        var center = sH / 30.0d;
+        var intCenter = (int)Math.Round(Math.Floor(center));
+        center = 50d
+            - ((1d - center + intCenter) * cent[intCenter]
+                + (center - intCenter) * cent[intCenter + 1])
+            * sS;
+        sL = (sL < center
+                ? sL / center
+                : 1d + (sL - center) / (100d - center))
+            * 50d;
+        return FromHsl(sH, sS, sL);
+    }
+
+    public NColor Alpha(double alpha)
+    {
+        var copy = this;
+        copy.A = (float)alpha;
+        return copy;
     }
 
     #endregion
