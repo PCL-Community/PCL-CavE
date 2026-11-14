@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # 生成未签名（可选本地 ad-hoc 签名）的 macOS .app。
-# 用法：scripts/package-macos.sh <osx-arm64> <configuration> <version> <output-dir>
+# 用法：scripts/package-macos.sh <osx-arm64|osx-x64> <configuration> <version> <output-dir>
 set -euo pipefail
 
-RID="${1:?usage: package-macos.sh <osx-arm64> <configuration> <version> <output-dir>}"
-CONFIG="${2:?usage: package-macos.sh <osx-arm64> <configuration> <version> <output-dir>}"
-VERSION="${3:?usage: package-macos.sh <osx-arm64> <configuration> <version> <output-dir>}"
-OUT="${4:?usage: package-macos.sh <osx-arm64> <configuration> <version> <output-dir>}"
+RID="${1:?usage: package-macos.sh <osx-arm64|osx-x64> <configuration> <version> <output-dir>}"
+CONFIG="${2:?usage: package-macos.sh <osx-arm64|osx-x64> <configuration> <version> <output-dir>}"
+VERSION="${3:?usage: package-macos.sh <osx-arm64|osx-x64> <configuration> <version> <output-dir>}"
+OUT="${4:?usage: package-macos.sh <osx-arm64|osx-x64> <configuration> <version> <output-dir>}"
 
 case "$RID" in
-  osx-arm64) ;;
-  *) echo "unsupported RID: $RID (expected osx-arm64)" >&2; exit 2 ;;
+  osx-arm64) PLATFORM=ARM64 ;;
+  osx-x64) PLATFORM=x64 ;;
+  *) echo "unsupported RID: $RID (expected osx-arm64 or osx-x64)" >&2; exit 2 ;;
 esac
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,8 +22,6 @@ TEMP="$OUT/.publish-$RID"
 
 rm -rf "$APP" "$TEMP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-
-PLATFORM=ARM64
 
 "$DOTNET" publish "$ROOT/PCL.Launcher/PCL.Launcher.csproj" \
   -c "$CONFIG" -r "$RID" --no-self-contained \
