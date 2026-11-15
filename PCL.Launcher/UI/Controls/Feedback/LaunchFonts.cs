@@ -9,14 +9,11 @@ using PCL.Core.Logging;
 namespace PCL.UI.Controls;
 
 /// <summary>
-///     启动器字体链：内置的 <c>PCL English</c> 负责拉丁字形，其余字体按当前 UI 语言回退到系统字体。
 ///     用户指定字体时插到首位，由 <see cref="InstallGlobalFont" /> 写入应用级资源。
 /// </summary>
 internal static class LaunchFonts
 {
     public const string ApplicationFontKey = "LaunchFontFamily";
-    private const string EmbeddedFontFamily = "PCL English";
-    internal const string EmbeddedFontUri = "avares://PCL.Launcher/Assets/Fonts#PCL English";
 
     private static readonly Lock PreviewFallbackLock = new();
     private static string? _previewFallbackChain;
@@ -93,15 +90,7 @@ internal static class LaunchFonts
                 return _previewFallbackChain;
 
             var families = GetDefaultFamilies(profile)
-                .Select(family => string.Equals(
-                    family,
-                    EmbeddedFontFamily,
-                    StringComparison.OrdinalIgnoreCase)
-                    ? EmbeddedFontUri
-                    : family)
-                .Where(family =>
-                    family.StartsWith("avares://", StringComparison.OrdinalIgnoreCase)
-                    || _IsFontAvailable(family))
+                .Where(_IsFontAvailable)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -187,15 +176,7 @@ internal static class LaunchFonts
     {
         var names = families
             .Where(family => !string.IsNullOrWhiteSpace(family))
-            .Where(family =>
-                string.Equals(family, EmbeddedFontFamily, StringComparison.OrdinalIgnoreCase)
-                || _IsFontAvailable(family))
-            .Select(family => string.Equals(
-                family,
-                EmbeddedFontFamily,
-                StringComparison.OrdinalIgnoreCase)
-                ? EmbeddedFontUri
-                : family)
+            .Where(_IsFontAvailable)
             .Distinct(StringComparer.OrdinalIgnoreCase);
 
         try
@@ -214,7 +195,6 @@ internal static class LaunchFonts
         {
             LocalizationFontProfile.English =>
             [
-                EmbeddedFontFamily,
                 "Microsoft YaHei UI",
                 "Segoe UI",
                 "Helvetica Neue",
@@ -224,7 +204,6 @@ internal static class LaunchFonts
 
             LocalizationFontProfile.SimplifiedChinese =>
             [
-                EmbeddedFontFamily,
                 "Microsoft YaHei UI",
                 "Segoe UI",
                 "PingFang SC",
@@ -238,7 +217,6 @@ internal static class LaunchFonts
 
             LocalizationFontProfile.TraditionalChinese =>
             [
-                EmbeddedFontFamily,
                 "Microsoft JhengHei UI",
                 "Microsoft YaHei UI",
                 "Segoe UI",
@@ -250,7 +228,6 @@ internal static class LaunchFonts
 
             LocalizationFontProfile.Japanese =>
             [
-                EmbeddedFontFamily,
                 "Yu Gothic UI",
                 "Microsoft YaHei UI",
                 "Segoe UI",
@@ -262,7 +239,6 @@ internal static class LaunchFonts
 
             LocalizationFontProfile.Korean =>
             [
-                EmbeddedFontFamily,
                 "Malgun Gothic",
                 "Microsoft YaHei UI",
                 "Segoe UI",
@@ -273,7 +249,6 @@ internal static class LaunchFonts
 
             _ =>
             [
-                EmbeddedFontFamily,
                 "Segoe UI",
                 "Microsoft YaHei UI",
                 "PingFang SC",
