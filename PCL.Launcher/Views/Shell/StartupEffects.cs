@@ -219,35 +219,42 @@ public sealed class StartupEffects(
 
     private static async Task ShowEnvironmentWarningAsync()
     {
-        var problems = new List<string>();
-        if (OperatingSystem.IsWindows() && !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763))
-            problems.Add(Lang.Text("Application.EnvironmentWarning.WindowsVersion"));
-        if (SystemInfo.Is32BitSystem)
-            problems.Add(Lang.Text("Application.EnvironmentWarning.System32Bit"));
+        try
+        {
+            var problems = new List<string>();
+            if (OperatingSystem.IsWindows() && !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763))
+                problems.Add(Lang.Text("Application.EnvironmentWarning.WindowsVersion"));
+            if (SystemInfo.Is32BitSystem)
+                problems.Add(Lang.Text("Application.EnvironmentWarning.System32Bit"));
 
-        var exePath = Basics.ExecutablePath;
-        if (Paths.PackageKind is null
-            && (exePath.Contains(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase)
-                || exePath.Contains(@"AppData\Local\Temp\", StringComparison.OrdinalIgnoreCase)))
-            problems.Add(Lang.Text("Application.EnvironmentWarning.TempFolder"));
-        if (exePath.Contains("wechat_files", StringComparison.OrdinalIgnoreCase)
-            || exePath.Contains("WeChat Files", StringComparison.OrdinalIgnoreCase)
-            || exePath.Contains("Tencent Files", StringComparison.OrdinalIgnoreCase))
-            problems.Add(Lang.Text("Application.EnvironmentWarning.SocialSoftwareFolder"));
+            var exePath = Basics.ExecutablePath;
+            if (Paths.PackageKind is null
+                && (exePath.Contains(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase)
+                    || exePath.Contains(@"AppData\Local\Temp\", StringComparison.OrdinalIgnoreCase)))
+                problems.Add(Lang.Text("Application.EnvironmentWarning.TempFolder"));
+            if (exePath.Contains("wechat_files", StringComparison.OrdinalIgnoreCase)
+                || exePath.Contains("WeChat Files", StringComparison.OrdinalIgnoreCase)
+                || exePath.Contains("Tencent Files", StringComparison.OrdinalIgnoreCase))
+                problems.Add(Lang.Text("Application.EnvironmentWarning.SocialSoftwareFolder"));
 
-        if (problems.Count == 0) return;
-        LogWrapper.Warn("UI", $"启动环境检查发现 {problems.Count} 个问题");
+            if (problems.Count == 0) return;
+            LogWrapper.Info("UI", $"启动环境检查发现 {problems.Count} 个问题");
 
-        await DialogService.Instance.ShowAsync(
-            new TextDialogRequest
-            {
-                Title = Lang.Text("Application.EnvironmentWarning.Title"),
-                Content = Lang.Text(
-                    "Application.EnvironmentWarning.Message",
-                    string.Join(Environment.NewLine, problems)),
-                Buttons = DialogButtons.Create("Application.EnvironmentWarning.IKnow"),
-                IsWarn = true
-            });
+            await DialogService.Instance.ShowAsync(
+                new TextDialogRequest
+                {
+                    Title = Lang.Text("Application.EnvironmentWarning.Title"),
+                    Content = Lang.Text(
+                        "Application.EnvironmentWarning.Message",
+                        string.Join(Environment.NewLine, problems)),
+                    Buttons = DialogButtons.Create("Application.EnvironmentWarning.IKnow"),
+                    IsWarn = true
+                });
+        }
+        catch (Exception ex)
+        {
+            LogWrapper.Warn(ex, "UI", "启动环境检查失败");
+        }
     }
 
     private static async Task ShowEulaDialogAsync()
