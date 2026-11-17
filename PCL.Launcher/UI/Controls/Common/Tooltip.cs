@@ -389,9 +389,6 @@ public sealed class Tooltip
 
         if (_target is not { } opened || !GetFollowCursor(opened)) return;
 
-        // Opened 在 Show() 后才同步触发，PopupRoot 尚未 Measure/Arrange；
-        // 而 ArrangeSetBounds 会用 Popup 缓存的光标位置改写 PlacementRect。
-        // 故延后到布局结束再对齐一次，并用 opened 校验期间是否已切换目标。
         Dispatcher.UIThread.Post(
             () =>
             {
