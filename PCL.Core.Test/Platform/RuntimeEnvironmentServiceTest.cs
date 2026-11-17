@@ -40,29 +40,40 @@ public sealed class RuntimeEnvironmentServiceTest
     [TestMethod]
     public void WindowsIgnoresNormalFolder()
     {
-        var issues = new WindowsRuntimeEnvironmentService().GetIssues(@"D:\Games\PCL\PCL.Launcher.exe").ToList();
+        var service = new WindowsRuntimeEnvironmentService();
 
-        CollectionAssert.DoesNotContain(issues, RuntimeEnvironmentIssue.TempFolder);
-        CollectionAssert.DoesNotContain(issues, RuntimeEnvironmentIssue.SocialSoftwareFolder);
+        foreach (var path in new[]
+                 {
+                     @"D:\Games\PCL\PCL.Launcher.exe",
+                     @"D:\Games\Tencent Files Backup\PCL.Launcher.exe",
+                     @"D:\Games\my_wechat_files_old\PCL.Launcher.exe"
+                 })
+        {
+            var issues = service.GetIssues(path).ToList();
+            CollectionAssert.DoesNotContain(issues, RuntimeEnvironmentIssue.TempFolder);
+            CollectionAssert.DoesNotContain(issues, RuntimeEnvironmentIssue.SocialSoftwareFolder);
+        }
     }
 
     [TestMethod]
-    public void LinuxIgnoresTempFolderWhenRunningFromAppImage()
+    public void LinuxIgnoresTempFolderOnlyInsideAppImageMount()
     {
-        var previous = Environment.GetEnvironmentVariable("APPIMAGE");
+        var previous = Environment.GetEnvironmentVariable("APPDIR");
         try
         {
             var service = new LinuxRuntimeEnvironmentService();
+            var otherTempExe = Path.Combine(Path.GetTempPath(), "Other", "PCL.Launcher.exe");
 
-            Environment.SetEnvironmentVariable("APPIMAGE", null);
+            Environment.SetEnvironmentVariable("APPDIR", null);
             CollectionAssert.Contains(service.GetIssues(_TempExe).ToList(), RuntimeEnvironmentIssue.TempFolder);
 
-            Environment.SetEnvironmentVariable("APPIMAGE", "/home/steve/PCL.AppImage");
+            Environment.SetEnvironmentVariable("APPDIR", Path.Combine(Path.GetTempPath(), "PCL"));
             CollectionAssert.DoesNotContain(service.GetIssues(_TempExe).ToList(), RuntimeEnvironmentIssue.TempFolder);
+            CollectionAssert.Contains(service.GetIssues(otherTempExe).ToList(), RuntimeEnvironmentIssue.TempFolder);
         }
         finally
         {
-            Environment.SetEnvironmentVariable("APPIMAGE", previous);
+            Environment.SetEnvironmentVariable("APPDIR", previous);
         }
     }
 
