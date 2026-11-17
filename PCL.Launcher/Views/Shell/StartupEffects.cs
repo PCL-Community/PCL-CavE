@@ -6,6 +6,7 @@ using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Localization;
 using PCL.Core.Logging;
+using PCL.Core.Platform;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.Utils.OS;
 using PCL.UI;
@@ -221,24 +222,20 @@ public sealed class StartupEffects(
     {
         try
         {
-            var problems = new List<string>();
-            if (OperatingSystem.IsWindows() && !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763))
-                problems.Add(Lang.Text("Application.EnvironmentWarning.WindowsVersion"));
-            if (SystemInfo.Is32BitSystem)
-                problems.Add(Lang.Text("Application.EnvironmentWarning.System32Bit"));
+            var service = ApplicationRuntime.GetService<IRuntimeEnvironmentService>()
+                ?? throw new InvalidOperationException("运行环境检查服务尚未初始化");
+            var issues = service.GetIssues(Basics.ExecutablePath);
+            if (issues.Count == 0) return;
+            LogWrapper.Info("UI", $"启动环境检查发现问题：{string.Join(", ", issues)}");
 
-            var exePath = Basics.ExecutablePath;
-            if (Paths.PackageKind is null
-                && (exePath.Contains(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase)
-                    || exePath.Contains(@"AppData\Local\Temp\", StringComparison.OrdinalIgnoreCase)))
-                problems.Add(Lang.Text("Application.EnvironmentWarning.TempFolder"));
-            if (exePath.Contains("wechat_files", StringComparison.OrdinalIgnoreCase)
-                || exePath.Contains("WeChat Files", StringComparison.OrdinalIgnoreCase)
-                || exePath.Contains("Tencent Files", StringComparison.OrdinalIgnoreCase))
-                problems.Add(Lang.Text("Application.EnvironmentWarning.SocialSoftwareFolder"));
-
-            if (problems.Count == 0) return;
-            LogWrapper.Info("UI", $"启动环境检查发现 {problems.Count} 个问题");
+            var problems = issues.Select(issue => Lang.Text(issue switch
+            {
+                RuntimeEnvironmentIssue.OutdatedSystem => "Application.EnvironmentWarning.WindowsVersion",
+                RuntimeEnvironmentIssue.System32Bit => "Application.EnvironmentWarning.System32Bit",
+                RuntimeEnvironmentIssue.TempFolder => "Application.EnvironmentWarning.TempFolder",
+                RuntimeEnvironmentIssue.SocialSoftwareFolder => "Application.EnvironmentWarning.SocialSoftwareFolder",
+                _ => throw new ArgumentOutOfRangeException(nameof(issue), issue, null)
+            }));
 
             await DialogService.Instance.ShowAsync(
                 new TextDialogRequest
