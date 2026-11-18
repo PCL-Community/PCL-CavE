@@ -10,17 +10,30 @@ internal static partial class MacOsWindowChrome
 
     public static void Attach(Window window, Control header)
     {
-        void Update(object? sender, EventArgs args)
+        var updateTimer = new DispatcherTimer
         {
-            Dispatcher.UIThread.Post(
-                () => CenterTrafficLights(window, header.Bounds.Height),
-                DispatcherPriority.Loaded);
+            Interval = TimeSpan.FromMilliseconds(16)
+        };
+        updateTimer.Tick += (_, _) =>
+        {
+            updateTimer.Stop();
+            CenterTrafficLights(window, header.Bounds.Height);
+        };
+
+        void ScheduleUpdate()
+        {
+            updateTimer.Stop();
+            updateTimer.Start();
         }
 
-        window.Opened += Update;
-        window.SizeChanged += Update;
-        window.Activated += Update;
-        header.SizeChanged += Update;
+        window.Opened += (_, _) => ScheduleUpdate();
+        window.Activated += (_, _) => ScheduleUpdate();
+        header.SizeChanged += (_, _) => ScheduleUpdate();
+        window.PropertyChanged += (_, e) =>
+        {
+            if (e.Property.Name is "CanResize" or "CanMaximize")
+                ScheduleUpdate();
+        };
     }
 
     private static void CenterTrafficLights(Window window, double headerHeight)
@@ -29,37 +42,63 @@ internal static partial class MacOsWindowChrome
             || window.TryGetPlatformHandle() is not { Handle: not 0, HandleDescriptor: "NSWindow" } handle)
             return;
 
-        var closeButton = Send(handle.Handle, Selector("standardWindowButton:"), 0);
+        var windowHandle = handle.Handle;
+        HideZoomButton(windowHandle);
+
+        var closeButton = Send(windowHandle, Selector("standardWindowButton:"), 0);
         if (closeButton == 0) return;
         var titleBar = Send(closeButton, Selector("superview"));
         var container = Send(titleBar, Selector("superview"));
-
-        // Avalonia 将不可最大化的窗口显示为灰色按钮。macOS 版本不支持最大化时，
-        // 保持窗口可最大化状态并直接隐藏绿色缩放按钮。
-        var zoomButton = Send(handle.Handle, Selector("standardWindowButton:"), 2);
-        if (zoomButton != 0)
-            Send(zoomButton, Selector("setHidden:"), 1);
         if (titleBar == 0 || container == 0) return;
 
         // Avalonia 的高度提示只调整材质区域，原生按钮仍需按 header 高度居中。
         var containerFrame = GetFrame(container);
-        containerFrame.Y = GetFrame(handle.Handle).Height - headerHeight;
-        containerFrame.Height = headerHeight;
-        SetFrame(container, Selector("setFrame:"), containerFrame);
+        var windowFrame = GetFrame(windowHandle);
+        var desiredContainerY = windowFrame.Height - headerHeight;
+        if (!NearlyEqual(containerFrame.Y, desiredContainerY)
+            || !NearlyEqual(containerFrame.Height, headerHeight))
+        {
+            containerFrame.Y = desiredContainerY;
+            containerFrame.Height = headerHeight;
+            SetFrame(container, Selector("setFrame:"), containerFrame);
+        }
 
         var titleFrame = GetFrame(titleBar);
-        titleFrame.Y = 0d;
-        titleFrame.Height = headerHeight;
-        SetFrame(titleBar, Selector("setFrame:"), titleFrame);
-
-        for (nint kind = 0; kind < 3; kind++)
+        if (!NearlyEqual(titleFrame.Y, 0d) || !NearlyEqual(titleFrame.Height, headerHeight))
         {
-            var button = Send(handle.Handle, Selector("standardWindowButton:"), kind);
-            if (button == 0) continue;
-            var frame = GetFrame(button);
-            frame.Y = (headerHeight - frame.Height) / 2d;
-            SetFrame(button, Selector("setFrame:"), frame);
+            titleFrame.Y = 0d;
+            titleFrame.Height = headerHeight;
+            SetFrame(titleBar, Selector("setFrame:"), titleFrame);
         }
+
+        for (nint kind = 0; kind < 2; kind++)
+        {
+            var button = Send(windowHandle, Selector("standardWindowButton:"), kind);
+            if (button == 0) continue;
+
+            var frame = GetFrame(button);
+            var desiredY = (headerHeight - frame.Height) / 2d;
+            if (!NearlyEqual(frame.Y, desiredY))
+            {
+                frame.Y = desiredY;
+                SetFrame(button, Selector("setFrame:"), frame);
+            }
+        }
+
+        // Changing the native titlebar frame can cause AppKit to recreate button state.
+        HideZoomButton(windowHandle);
+    }
+
+    private static void HideZoomButton(nint window)
+    {
+        var zoomButton = Send(window, Selector("standardWindowButton:"), 2);
+        if (zoomButton != 0)
+            Send(zoomButton, Selector("setHidden:"), 1);
+    }
+
+    private static bool NearlyEqual(double left, double right)
+    {
+        return Math.Abs(left - right) < 0.01d;
     }
 
     private static NativeRect GetFrame(nint view)
