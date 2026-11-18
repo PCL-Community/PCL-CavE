@@ -18,7 +18,7 @@
         ExtendClientAreaTitleBarHeightHint="{OnPlatform -1, macOS=48}"
         Background="Transparent"
         CanResize="True"
-        CanMaximize="{OnPlatform True, macOS=False}"
+        CanMaximize="{OnPlatform True, macOS=True}"
         TransparencyBackgroundFallback="{DynamicResource ColorBrushBackground}"
         Title="Plain Craft Launcher Community Edition ">
     <Grid x:Name="PanRoot"

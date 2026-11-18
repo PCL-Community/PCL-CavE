@@ -33,6 +33,12 @@ internal static partial class MacOsWindowChrome
         if (closeButton == 0) return;
         var titleBar = Send(closeButton, Selector("superview"));
         var container = Send(titleBar, Selector("superview"));
+
+        // Avalonia 将不可最大化的窗口显示为灰色按钮。macOS 版本不支持最大化时，
+        // 保持窗口可最大化状态并直接隐藏绿色缩放按钮。
+        var zoomButton = Send(handle.Handle, Selector("standardWindowButton:"), 2);
+        if (zoomButton != 0)
+            Send(zoomButton, Selector("setHidden:"), 1);
         if (titleBar == 0 || container == 0) return;
 
         // Avalonia 的高度提示只调整材质区域，原生按钮仍需按 header 高度居中。
