@@ -14,9 +14,8 @@ using PCL.UI.Controls;
 namespace PCL.Views.Pages.Setup;
 
 /// <summary>
-///     启动设置页：实例隔离、窗口标题/大小/优先级、内存分配与 JVM/游戏参数。
-///     状态与配置写入由 <see cref="PageSetupLaunchViewModel" /> 负责，页面仅处理视图生命周期、
-///     用户选择确认、内存占用条动画与动态文本排布。
+/// 启动设置页：实例隔离、窗口标题/大小/优先级、内存分配与 JVM/游戏参数。 状态与配置写入由
+/// <see cref="PageSetupLaunchViewModel" /> 负责，页面仅处理视图生命周期、 用户选择确认、内存占用条动画与动态文本排布。
 /// </summary>
 public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
 {
@@ -40,16 +39,14 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
         var java = PlatformRuntime.Current.Java;
         CheckAdvanceNoJavaw.IsEnabled = java.SupportsJavaw;
         if (!java.SupportsJavaw)
-            ToolTip.SetTip(
-                CheckAdvanceNoJavaw,
-                Lang.Text("Setup.Launch.Advanced.UseJavaExe.Unsupported"));
+            CheckAdvanceNoJavaw.SetLocalizedValue(
+                ToolTip.TipProperty,
+                "Setup.Launch.Advanced.UseJavaExe.Unsupported");
 
         SliderRamCustom.getHintText = new Func<object, object>(value =>
-            Lang.Number(PageSetupLaunchViewModel.GetRamFromTick(Convert.ToInt32(value)), "N1")
-            + " GiB");
+            $"{Lang.Number(PageSetupLaunchViewModel.GetRamFromTick(Convert.ToInt32(value)), "N1")} GiB");
         SliderRamInitialCustom.getHintText = new Func<object, object>(value =>
-            Lang.Number(PageSetupLaunchViewModel.GetRamFromTick(Convert.ToInt32(value)), "N1")
-            + " GiB");
+            $"{Lang.Number(PageSetupLaunchViewModel.GetRamFromTick(Convert.ToInt32(value)), "N1")} GiB");
 
         TextArgumentInfo.ValidateRules.Add(new BlacklistValidator(["\"", "\u201c", "\u201d"]));
         TextArgumentInfo.ValidatedTextChanged += (_, _) =>
@@ -111,7 +108,7 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
         Reload();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack.ScrollToHome();
         _isActive = true;
@@ -123,14 +120,6 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
     public override void OnNavigatedFrom()
     {
         _isActive = false;
-    }
-
-    protected override void RefreshLocalization()
-    {
-        if (!_loaded) return;
-        RefreshDisableJlwToolTip();
-        Reload();
-        RefreshRamVisual(false);
     }
 
     public void Reload()
@@ -446,12 +435,11 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
     private void RefreshDisableJlwToolTip()
     {
         if (!_loaded) return;
-        ToolTip.SetTip(
-            CheckAdvanceDisableJLW,
-            Lang.Text(
-                SystemInfo.IsArm64System
-                    ? "Setup.Launch.Advanced.DisableJlw.Arm64Notice"
-                    : "Setup.Launch.Advanced.DisableJlw.ToolTip"));
+        CheckAdvanceDisableJLW.SetLocalizedValue(
+            ToolTip.TipProperty,
+            SystemInfo.IsArm64System
+                ? "Setup.Launch.Advanced.DisableJlw.Arm64Notice"
+                : "Setup.Launch.Advanced.DisableJlw.ToolTip");
         ToolTip.SetShowOnDisabled(CheckAdvanceDisableJLW, true);
     }
 
@@ -472,7 +460,7 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
     {
         var instance = InstanceList.McMcInstanceSelected;
         if (instance is null) return;
-        PageRouter.Navigate(PageType.InstanceSetup, PageSubType.VersionSetup, instance);
+        PageRouter.Navigate(PageIds.InstanceSetup, SubPageIds.VersionSetup, instance);
     }
 
     #endregion

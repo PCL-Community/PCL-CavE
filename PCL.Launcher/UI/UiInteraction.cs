@@ -404,15 +404,15 @@ public sealed class UpdateUiBridge : IUpdateUi
 
     public void NavigateSetupUpdate()
     {
-        PageRouter.Navigate(PageType.Setup, PageSubType.SetupUpdate);
+        PageRouter.Navigate(PageIds.Setup, SubPageIds.SetupUpdate);
     }
 
-    public void ShowUpdateRestartButton(string tooltip)
+    public void ShowUpdateRestartButton(string tooltipKey, params object?[] args)
     {
         UiInteraction.TryShellAction(
             nameof(ShowUpdateRestartButton),
             "SHELL",
-            shell => shell.ShowUpdateRestartButton(tooltip));
+            shell => shell.ShowUpdateRestartButton(tooltipKey, args));
     }
 
     public void RefreshDownloadButton()
@@ -420,7 +420,7 @@ public sealed class UpdateUiBridge : IUpdateUi
         UiInteraction.RefreshDownloadButton(nameof(RefreshDownloadButton));
     }
 
-    public void UpdateSetupButton(string text, bool enabled)
+    public void UpdateSetupButton(string textKey, bool enabled, params object?[] args)
     {
         var page = PageSetupUpdate.Current
             ?? PageRouter.CurrentPage as PageSetupUpdate;
@@ -430,7 +430,7 @@ public sealed class UpdateUiBridge : IUpdateUi
             return;
         }
 
-        UiInteraction.RunOnUi(() => page.SetUpdateButton(text, enabled));
+        UiInteraction.RunOnUi(() => page.SetUpdateButton(textKey, enabled, args));
     }
 
     public void ExitApplication(bool restart)
@@ -518,7 +518,7 @@ public sealed class LaunchUiBridge : ILaunchUi
 
     public void PrepareLaunchNavigation()
     {
-        PageRouter.Navigate(PageType.Launch);
+        PageRouter.Navigate(PageIds.Launch);
     }
 
     public void RefreshLaunchButtons()
@@ -604,7 +604,7 @@ public sealed class LaunchUiBridge : ILaunchUi
         // 导航与页面创建必须同处 UI 线程；PageLogLeft.Current 在宿主创建左页时同步赋值。
         UiInteraction.RunOnUi(() =>
         {
-            PageRouter.Navigate(PageType.GameLog);
+            PageRouter.Navigate(PageIds.GameLog);
             if (PageLogLeft.Current is { } sink)
             {
                 sink.AttachWatcher(watcher);
@@ -752,7 +752,7 @@ public sealed class WatcherUiBridge : IWatcherUi
 
     public void ShowFeedback()
     {
-        PageRouter.Navigate(PageType.Setup, PageSubType.SetupFeedback);
+        PageRouter.Navigate(PageIds.Setup, SubPageIds.SetupFeedback);
     }
 
     public void ShowHint(string text, NotificationType type = NotificationType.Info)

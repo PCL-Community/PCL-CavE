@@ -1,23 +1,22 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
-using ShapePath = Avalonia.Controls.Shapes.Path;
-using Avalonia.Input;
 using Avalonia.Input.Platform;
-using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Layout;
+using Avalonia.Markup.Xaml.MarkupExtensions;
 using Avalonia.Media;
 using Avalonia.Threading;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Hints;
 using PCL.Navigation;
 using PCL.UI.Controls;
+using ShapePath = Avalonia.Controls.Shapes.Path;
 
 namespace PCL.Views.Pages.Speed;
 
 /// <summary>
-///     任务管理页右栏：按 <see cref="Loading.loaderTaskbar" /> 中的加载器生成任务卡片，
-///     展示子任务的等待/进度/完成/失败状态，并提供取消按钮。
+/// 任务管理页右栏：按 <see cref="Loading.loaderTaskbar" /> 中的加载器生成任务卡片，
+/// 展示子任务的等待/进度/完成/失败状态，并提供取消按钮。
 /// </summary>
 public partial class PageSpeedRight : MyPageRight, IRefreshable
 {
@@ -56,7 +55,7 @@ public partial class PageSpeedRight : MyPageRight, IRefreshable
         RefreshNow();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack.ScrollToHome();
         SyncTasks();
@@ -66,13 +65,6 @@ public partial class PageSpeedRight : MyPageRight, IRefreshable
     public override void OnNavigatedFrom()
     {
         _timer.Stop();
-    }
-
-    protected override void RefreshLocalization()
-    {
-        _cards.Clear();
-        PanMain.Children.Clear();
-        SyncTasks();
     }
 
     /// <summary>立即同步任务卡片；可在任意线程调用。</summary>
@@ -163,9 +155,12 @@ public partial class PageSpeedRight : MyPageRight, IRefreshable
 
         var card = new MyCard
         {
-            Title = loader.name,
             Margin = new Thickness(0d, 0d, 0d, 15d)
         };
+        LocalizedText.Bind(
+            card,
+            MyCard.TitleProperty,
+            () => loader.DisplayNameFactory?.Invoke() ?? loader.name);
         var grid = new Grid
         {
             Margin = new Thickness(14d, 40d, 15d, 10d),
@@ -212,9 +207,12 @@ public partial class PageSpeedRight : MyPageRight, IRefreshable
             card.Grid.Children.Add(CreateStateIcon(subtask, row));
             var label = new TextBlock
             {
-                Text = subtask.name,
                 HorizontalAlignment = HorizontalAlignment.Left
             };
+            LocalizedText.Bind(
+                label,
+                TextBlock.TextProperty,
+                () => subtask.DisplayNameFactory?.Invoke() ?? subtask.name);
             Grid.SetColumn(label, 1);
             Grid.SetRow(label, row);
             card.Grid.Children.Add(label);
@@ -240,9 +238,6 @@ public partial class PageSpeedRight : MyPageRight, IRefreshable
             {
                 case LoadState.Waiting when icon.Tag as string != "Waiting":
                 case LoadState.Finished when icon.Tag as string != "Finished":
-                    ReplaceIcon(card, row, CreateStateIcon(subtask, row));
-                    break;
-
                 case LoadState.Loading when icon.Tag as string != "Loading":
                     ReplaceIcon(card, row, CreateStateIcon(subtask, row));
                     break;
@@ -270,7 +265,7 @@ public partial class PageSpeedRight : MyPageRight, IRefreshable
             HorizontalAlignment = HorizontalAlignment.Left,
             Margin = new Thickness(0d, 0d, 0d, 5d)
         };
-        ToolTip.SetTip(text, Lang.Text("Speed.Error.ClickToCopy"));
+        text.SetLocalizedValue(ToolTip.TipProperty, "Speed.Error.ClickToCopy");
         text.PointerPressed += (_, e) =>
         {
             if (!e.GetCurrentPoint(text).Properties.IsLeftButtonPressed)
@@ -405,7 +400,7 @@ public partial class PageSpeedRight : MyPageRight, IRefreshable
     {
         if (PanMain.Children.Count > 0)
             return;
-        if (PageRouter.Current.Page != PageType.TaskManager)
+        if (PageRouter.Current.Page != PageIds.TaskManager)
             return;
         _hadTasks = false;
         PageRouter.Back();

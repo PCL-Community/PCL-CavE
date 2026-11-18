@@ -9,6 +9,7 @@ using PCL.Core.App.Localization;
 using PCL.Core.UI;
 using PCL.Core.UI.Hints;
 using PCL.Core.Utils.Validate;
+using PCL.Navigation;
 using PCL.UI.Controls;
 using PCL.UI.Controls.Common;
 using PCL.Views.Pages.Launch;
@@ -17,8 +18,8 @@ using PCL.Views.Shell;
 namespace PCL.Views.Pages.Setup;
 
 /// <summary>
-///     外观设置页：窗口透明度、深浅色模式、配色主题、字体、标题栏类型、背景、背景音乐、自定义主页与功能隐藏。
-///     状态与配置写入由 <see cref="PageSetupUIViewModel" /> 承担；页面负责动态控件构建、文件选择与标题栏刷新。
+/// 外观设置页：窗口透明度、深浅色模式、配色主题、字体、标题栏类型、背景、背景音乐、自定义主页与功能隐藏。 状态与配置写入由
+/// <see cref="PageSetupUIViewModel" /> 承担；页面负责动态控件构建、文件选择与标题栏刷新。
 /// </summary>
 public partial class PageSetupUI : MyPageRight, ISetupResetPage
 {
@@ -202,7 +203,7 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         }
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack.ScrollToHome();
         if (_loaded) Reload();
@@ -212,25 +213,6 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
 
     public override void OnNavigatedFrom()
     {
-    }
-
-    protected override void RefreshLocalization()
-    {
-        if (!_loaded) return;
-        _reloading = true;
-        try
-        {
-            BuildThemeColorItems();
-            BuildHideGrid();
-        }
-        finally
-        {
-            _reloading = false;
-        }
-
-        Reload();
-        RefreshBackgroundState();
-        RefreshMusicState();
     }
 
     public void Reload()
@@ -312,11 +294,13 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         {
             combo.Items.Clear();
             for (var i = 0; i < count; i++)
-                combo.Items.Add(
-                    new MyComboBoxItem
-                    {
-                        Content = Lang.Text(ThemeColorKeys[i].Key)
-                    });
+            {
+                var item = new MyComboBoxItem();
+                item.SetLocalizedValue(
+                    ContentControl.ContentProperty,
+                    ThemeColorKeys[i].Key);
+                combo.Items.Add(item);
+            }
         }
     }
 
@@ -344,7 +328,8 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         HintCustomWarn.IsVisible = showHint && !States.Hint.UntrustedHomepage;
         if (showHint)
         {
-            HintCustom.Text = Lang.Text(
+            HintCustom.SetLocalizedValue(
+                MyHint.TextProperty,
                 type == 1
                     ? "Setup.Ui.Homepage.LocalFile.Hint"
                     : "Setup.Ui.Homepage.NetUpdate.Hint");
@@ -458,11 +443,11 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
             var musicAvailable = !hasMusic || service?.IsMusicAvailable == true;
             ViewModel.ApplyMusicState(hasMusic, count);
             BtnMusicRefresh.IsEnabled = musicAvailable;
-            ToolTip.SetTip(
-                BtnMusicRefresh,
+            BtnMusicRefresh.SetLocalizedValue(
+                ToolTip.TipProperty,
                 musicAvailable
-                    ? Lang.Text("Setup.Ui.Music.Refresh.ToolTip")
-                    : Lang.Text("Tools.GameLink.Finish.Unavailable"));
+                    ? "Setup.Ui.Music.Refresh.ToolTip"
+                    : "Tools.GameLink.Finish.Unavailable");
             ToolTip.SetShowOnDisabled(BtnMusicRefresh, true);
         }
         catch (Exception ex)
@@ -736,14 +721,14 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         bool isFirst,
         IReadOnlyList<HideCheckDefinition> items)
     {
-        PanHidePanel.Children.Add(
-            new TextBlock
-            {
-                Text = Lang.Text(titleKey),
-                Margin = new Thickness(0d, isFirst ? 4d : 12d, 0d, 4d),
-                FontSize = 12d,
-                Opacity = 0.6d
-            });
+        var title = new TextBlock
+        {
+            Margin = new Thickness(0d, isFirst ? 4d : 12d, 0d, 4d),
+            FontSize = 12d,
+            Opacity = 0.6d
+        };
+        title.SetLocalizedValue(TextBlock.TextProperty, titleKey);
+        PanHidePanel.Children.Add(title);
 
         var wrap = new WrapPanel();
         foreach (var item in items)
@@ -758,11 +743,14 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
             Height = 22d,
             Margin = new Thickness(0d, 0d, 12d, 4d),
             VerticalAlignment = VerticalAlignment.Center,
-            Text = definition.Literal ?? Lang.Text(definition.LangKey!),
             Tag = definition.ConfigKey
         };
+        if (definition.Literal is not null)
+            check.Text = definition.Literal;
+        else
+            check.SetLocalizedValue(MyCheckBox.TextProperty, definition.LangKey!);
         if (definition.TooltipKey is not null)
-            ToolTip.SetTip(check, Lang.Text(definition.TooltipKey));
+            check.SetLocalizedValue(ToolTip.TipProperty, definition.TooltipKey);
         check.Change += (_, _) =>
         {
             if (_reloading || check.Tag is not string tag) return;

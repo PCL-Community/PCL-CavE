@@ -1,4 +1,3 @@
-using PCL.Core.Platform;
 using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -6,10 +5,10 @@ using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Configuration.Storage;
 using PCL.Core.App.Localization;
-using PCL.Core.IO;
 using PCL.Core.Minecraft;
 using PCL.Core.Minecraft.Profile;
 using PCL.Core.Minecraft.Profile.Models;
+using PCL.Core.Platform;
 using PCL.Core.UI;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
@@ -43,7 +42,11 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
 
     [ObservableProperty] public partial bool ModpackVisible { get; set; }
 
-    [ObservableProperty] public partial string StarText { get; set; } = string.Empty;
+    /// <summary>收藏按钮文本，随实例收藏状态与语言变化。</summary>
+    public string StarText =>
+        Instance?.IsStar == true
+            ? Lang.Text("Instance.Overall.Unfavorite")
+            : Lang.Text("Instance.Overall.Favorite");
 
     [ObservableProperty] public partial bool CardTypeComboEnabled { get; set; } = true;
 
@@ -74,9 +77,7 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
             return;
         var path = Instance.PathInstance;
         CardTypeIndex = Math.Clamp(States.Instance.CardType[path], 0, 5);
-        StarText = Instance.IsStar
-            ? Lang.Text("Instance.Overall.Unfavorite")
-            : Lang.Text("Instance.Overall.Favorite");
+        OnPropertyChanged(nameof(StarText));
         ModsFolderVisible = Instance.Modable;
         LogoTag = States.Instance.LogoPath[path] ?? string.Empty;
         IsCustomLogo = States.Instance.IsLogoCustom[path];
@@ -134,8 +135,8 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
         var launchCount = States.Instance.LaunchCount[instance.PathInstance];
         rows.Add(
             new InstanceInfoRow(
-                Lang.Text("Instance.Overall.Info.LaunchCount.Title"),
-                launchCount == 0
+                () => Lang.Text("Instance.Overall.Info.LaunchCount.Title"),
+                () => launchCount == 0
                     ? Lang.Text("Instance.Overall.Info.LaunchCount.Never")
                     : Lang.Text("Instance.Overall.Info.LaunchCount.Count", launchCount),
                 $"{LauncherPaths.ImageRoot}Blocks/{(launchCount == 0 ? "RedstoneLampOff" : "RedstoneLampOn")}.png"));
@@ -143,13 +144,13 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(States.Instance.ModpackVersion[instance.PathInstance]))
             rows.Add(
                 new InstanceInfoRow(
-                    Lang.Text("Instance.Overall.Info.ModpackVersion"),
-                    States.Instance.ModpackVersion[instance.PathInstance],
+                    () => Lang.Text("Instance.Overall.Info.ModpackVersion"),
+                    () => States.Instance.ModpackVersion[instance.PathInstance],
                     $"{LauncherPaths.ImageRoot}Blocks/CommandBlock.png"));
         rows.Add(
             new InstanceInfoRow(
-                "Minecraft",
-                McInstanceInfo.GetVanillaNameDisplay(instanceInfo.VanillaName),
+                () => "Minecraft",
+                () => McInstanceInfo.GetVanillaNameDisplay(instanceInfo.VanillaName),
                 $"{LauncherPaths.ImageRoot}Blocks/Grass.png"));
         if (instanceInfo.HasForge)
             rows.Add(CreateLoaderRow("Forge", instanceInfo.Forge, "Anvil"));
@@ -166,8 +167,8 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
         if (instanceInfo.HasLiteLoader)
             rows.Add(
                 new InstanceInfoRow(
-                    "LiteLoader",
-                    Lang.Text("Instance.Overall.Info.Installed"),
+                    () => "LiteLoader",
+                    () => Lang.Text("Instance.Overall.Info.Installed"),
                     $"{LauncherPaths.ImageRoot}Blocks/Egg.png"));
         if (instanceInfo.HasLegacyFabric)
             rows.Add(CreateLoaderRow("Legacy Fabric", instanceInfo.LegacyFabric, "Fabric"));
@@ -179,8 +180,10 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
     private static InstanceInfoRow CreateLoaderRow(string name, string? version, string logo)
     {
         return new InstanceInfoRow(
-            name,
-            string.IsNullOrEmpty(version) ? Lang.Text("Minecraft.Version.Unknown") : version,
+            () => name,
+            () => string.IsNullOrEmpty(version)
+                ? Lang.Text("Minecraft.Version.Unknown")
+                : version,
             $"{LauncherPaths.ImageRoot}Blocks/{logo}.png");
     }
 
@@ -463,7 +466,7 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
 
             RefreshInstanceList();
             PageRouter.Navigate(
-                new PageStackData(PageType.InstanceSetup, PageSubType.VersionOverall, reloaded));
+                new PageRoute(PageIds.InstanceSetup, SubPageIds.VersionOverall, reloaded));
             InstanceChanged?.Invoke();
         }
         catch (Exception ex)
@@ -588,7 +591,7 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
                         instance = Instance,
                         IsTest = true
                     }))
-                PageRouter.Navigate(PageType.Launch);
+                PageRouter.Navigate(PageIds.Launch);
         }
         catch (Exception ex)
         {
@@ -807,7 +810,7 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
             combo.Start(instance.PathInstance);
             Loading.LoaderTaskbarAdd(combo);
             LoadingUi.Current?.RefreshDownloadButton();
-            PageRouter.Navigate(PageType.Launch);
+            PageRouter.Navigate(PageIds.Launch);
         }
         catch (CancelledException)
         {
@@ -839,7 +842,7 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
                     instance.PathIndie,
                     GameFolders.mcFolderSelected,
                     StringComparison.OrdinalIgnoreCase);
-            var recycleSupported = PCL.Core.Platform.PlatformRuntime.Current.RecycleBin.IsSupported(instancePath);
+            var recycleSupported = PlatformRuntime.Current.RecycleBin.IsSupported(instancePath);
             var effectivePermanent = permanent || !recycleSupported;
 
             var confirmMessageKey = (isIsolatedInstance, effectivePermanent) switch
@@ -882,7 +885,7 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
             }
             else
             {
-                var outcome = PCL.Core.Platform.PlatformRuntime.Current.RecycleBin.Move(instancePath, out var error);
+                var outcome = PlatformRuntime.Current.RecycleBin.Move(instancePath, out var error);
                 switch (outcome)
                 {
                     case RecycleBinOutcome.Moved:
@@ -1059,11 +1062,12 @@ public partial class PageInstanceOverallViewModel : ViewModelBase
 
 /// <summary>实例信息表中的一行。</summary>
 public sealed class InstanceInfoRow(
-    string title,
-    string info,
+    Func<string> title,
+    Func<string> info,
     string logo)
+    : LocalizedObservableObject
 {
-    public string Title { get; } = title;
-    public string Info { get; } = info;
+    public string Title => title();
+    public string Info => info();
     public string Logo { get; } = logo;
 }

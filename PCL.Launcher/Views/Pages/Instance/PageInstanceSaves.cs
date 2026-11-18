@@ -1,19 +1,20 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using PCL.Core.App.Localization;
 using PCL.Core.IO;
 using PCL.Core.Platform;
 using PCL.Core.UI.Hints;
+using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Instance;
 
 /// <summary>
-///     实例存档列表页：扫描实例 <c>saves</c> 目录下的存档文件夹并显示名称、创建/修改时间与图标；
-///     支持搜索、按文件名/创建时间/修改时间排序、空态三按钮（打开文件夹/下载新存档/粘贴剪贴板文件），
-///     点击进入存档详情；删除优先移入系统回收站，不支持回收站时明确告知永久删除。
+/// 实例存档列表页：扫描实例 <c>saves</c> 目录下的存档文件夹并显示名称、创建/修改时间与图标；
+/// 支持搜索、按文件名/创建时间/修改时间排序、空态三按钮（打开文件夹/下载新存档/粘贴剪贴板文件）， 点击进入存档详情；删除优先移入系统回收站，不支持回收站时明确告知永久删除。
 /// </summary>
 public partial class PageInstanceSaves : MyPageRight, IRefreshable
 {
@@ -76,7 +77,7 @@ public partial class PageInstanceSaves : MyPageRight, IRefreshable
         HintService.Show(Hints.Info(Lang.Text("Instance.Saves.Status.Refreshing"), false));
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         _isActive = true;
         ViewModel.StopWatcher();
@@ -92,12 +93,6 @@ public partial class PageInstanceSaves : MyPageRight, IRefreshable
         _isActive = false;
         ViewModel.StopWatcher();
         _fileSystemRefreshTimer?.Stop();
-    }
-
-    protected override void RefreshLocalization()
-    {
-        ViewModel.RefreshLocalization();
-        BuildList();
     }
 
     public async Task ReloadAsync()
@@ -189,23 +184,23 @@ public partial class PageInstanceSaves : MyPageRight, IRefreshable
         {
             Type = MyListItem.CheckType.Clickable,
             Title = entry.Title,
-            Info = entry.Info,
             Logo = entry.Logo,
             LogoCornerRadius = new CornerRadius(6),
             Tag = folder
         };
-        entry.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(SaveEntry.Info))
-                item.Info = entry.Info;
-        };
+        item.Bind(
+            MyListItem.InfoProperty,
+            new Binding(nameof(SaveEntry.Info))
+            {
+                Source = entry
+            });
 
         var open = new MyIconButton
         {
             SvgIcon = "lucide/folder-open",
             LogoScale = 0.9d
         };
-        ToolTip.SetTip(open, Lang.Text("Instance.Saves.OpenFolder"));
+        open.SetLocalizedValue(ToolTip.TipProperty, "Instance.Saves.OpenFolder");
         open.Click += (_, _) => ViewModel.OpenSaveFolderCommand.Execute(folder);
 
         var detail = new MyIconButton
@@ -213,7 +208,7 @@ public partial class PageInstanceSaves : MyPageRight, IRefreshable
             SvgIcon = "lucide/info",
             LogoScale = 0.9d
         };
-        ToolTip.SetTip(detail, Lang.Text("Instance.Saves.Details"));
+        detail.SetLocalizedValue(ToolTip.TipProperty, "Instance.Saves.Details");
         detail.Click += (_, _) => ViewModel.OpenDetailsCommand.Execute(folder);
 
         var copy = new MyIconButton
@@ -221,7 +216,7 @@ public partial class PageInstanceSaves : MyPageRight, IRefreshable
             SvgIcon = "lucide/copy",
             LogoScale = 0.9d
         };
-        ToolTip.SetTip(copy, Lang.Text("Common.Action.Copy"));
+        copy.SetLocalizedValue(ToolTip.TipProperty, "Common.Action.Copy");
         copy.Click += (_, _) => _ = ViewModel.CopySaveAsync(folder);
 
         var delete = new MyIconButton
@@ -229,11 +224,10 @@ public partial class PageInstanceSaves : MyPageRight, IRefreshable
             SvgIcon = "lucide/trash-2",
             LogoScale = 0.9d
         };
-        ToolTip.SetTip(delete, Lang.Text("Common.Action.Delete"));
+        delete.SetLocalizedValue(ToolTip.TipProperty, "Common.Action.Delete");
         delete.Click += async (_, _) =>
         {
             item.IsEnabled = false;
-            entry.Info = Lang.Text("Instance.Saves.Deleting");
             if (await ViewModel.DeleteSaveAsync(folder))
                 return;
             item.IsEnabled = true;
@@ -254,7 +248,7 @@ public partial class PageInstanceSaves : MyPageRight, IRefreshable
                 SvgIcon = "lucide/play",
                 LogoScale = 0.9d
             };
-            ToolTip.SetTip(launch, Lang.Text("Instance.Saves.QuickPlay"));
+            launch.SetLocalizedValue(ToolTip.TipProperty, "Instance.Saves.QuickPlay");
             launch.Click += (_, _) => ViewModel.LaunchSaveCommand.Execute(folder);
             buttons.Add(launch);
         }

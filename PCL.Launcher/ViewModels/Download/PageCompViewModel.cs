@@ -73,22 +73,12 @@ public partial class PageCompViewModel : ViewModelBase
 
     [ObservableProperty] public partial double LeftOpacity { get; set; } = 0.2d;
 
-    [ObservableProperty] public partial string LoadText { get; set; } = "";
-
-    [ObservableProperty]
-    public partial string LoadingText { get; set; } =
-        Lang.Text("Application.Control.Loading.Default");
-
-    [ObservableProperty] public partial string PageText { get; set; } = "1";
-
-    [ObservableProperty] public partial Comp.CompType PageType { get; set; } = Comp.CompType.Mod;
+    [ObservableProperty] public partial Comp.CompType PageIds { get; set; } = Comp.CompType.Mod;
 
     [ObservableProperty]
     public partial ObservableCollection<MyCompItemViewModel> Projects { get; set; } = [];
 
     [ObservableProperty] public partial double RightOpacity { get; set; } = 1d;
-
-    [ObservableProperty] public partial string SearchHintText { get; set; } = "";
 
     [ObservableProperty] public partial int SearchLoaderIndex { get; set; }
 
@@ -102,9 +92,7 @@ public partial class PageCompViewModel : ViewModelBase
 
     [ObservableProperty] public partial string SearchText { get; set; } = "";
 
-    [ObservableProperty]
-    public partial string SearchVersionText { get; set; } =
-        Lang.Text("Download.Comp.Filter.Version.AllInputAvailable");
+    [ObservableProperty] public partial string SearchVersionText { get; set; } = "";
 
     [ObservableProperty] public partial bool SupportCurseForge { get; set; } = true;
 
@@ -115,7 +103,6 @@ public partial class PageCompViewModel : ViewModelBase
     [ObservableProperty]
     public partial Comp.CompLoaderType TargetModLoader { get; set; } = Comp.CompLoaderType.Any;
 
-    /// <summary>分类下拉项，已包含“全部”和缩进/分组禁用信息。</summary>
     public ObservableCollection<CompCategoryFilterOption> CategoryOptions { get; } = [];
 
     public Loading.LoaderTask<Comp.CompProjectRequest, int>? Loader { get; private set; }
@@ -124,18 +111,25 @@ public partial class PageCompViewModel : ViewModelBase
 
     public Comp.CompLoaderType SelectedModLoader => GetSelectedModLoader();
 
+    public string SearchHintText => Comp.GetCompSearchName(PageIds);
+
+    public string LoadText => Comp.GetCompLoadingName(PageIds);
+
+    public string LoadingText => LoadText;
+
+    public string PageText => Lang.Number(_page + 1, "N0");
+
     public event Action? StateChanged;
 
     public event Action? ProjectsChanged;
 
     public event Action? CategoryOptionsChanged;
 
-    /// <summary>请求页面把列表滚动回顶部。</summary>
     public event Action? ScrollToTopRequested;
 
-    partial void OnPageTypeChanged(Comp.CompType value)
+    partial void OnPageIdsChanged(Comp.CompType value)
     {
-        ApplyPageTypeUi();
+        ApplyPageIdsUi();
     }
 
     public void Initialize()
@@ -143,13 +137,13 @@ public partial class PageCompViewModel : ViewModelBase
         if (Loader is not null)
             return;
         Loader = new Loading.LoaderTask<Comp.CompProjectRequest, int>(
-            Lang.Text("Download.Comp.List.Source.ResourceFetch", Comp.GetCompTypeName(PageType)),
+            Lang.Text("Download.Comp.List.Source.ResourceFetch", Comp.GetCompTypeName(PageIds)),
             Comp.CompProjectsGet)
         {
             reloadTimeout = 60 * 1000
         };
         Loader.OnStateChangedUi += OnLoaderStateChanged;
-        ApplyPageTypeUi();
+        ApplyPageIdsUi();
     }
 
     public void SetCategoryTags(IEnumerable<CompCategoryFilterTag> tags)
@@ -165,12 +159,12 @@ public partial class PageCompViewModel : ViewModelBase
         CategoryOptions.Clear();
         CategoryOptions.Add(
             new CompCategoryFilterOption(
-                Lang.Text("Common.Option.All"),
+                "Common.Option.All",
                 ""));
         foreach (var tag in _categoryTags)
             CategoryOptions.Add(
                 new CompCategoryFilterOption(
-                    Lang.Text(tag.TextKey),
+                    tag.TextKey,
                     tag.Tag ?? "",
                     !tag.IsGroupHeader,
                     tag.IsIndented));
@@ -180,29 +174,40 @@ public partial class PageCompViewModel : ViewModelBase
         CategoryOptionsChanged?.Invoke();
     }
 
-    public void ApplyPageTypeUi()
+    public void ApplyPageIdsUi()
     {
-        SearchHintText = Comp.GetCompSearchName(PageType);
-        LoadText = Comp.GetCompLoadingName(PageType);
-        LoadingText = LoadText;
-        IsInstallModPackVisible = PageType == Comp.CompType.ModPack;
-        var isModLike = PageType is Comp.CompType.Mod or Comp.CompType.ModPack;
-        var isShader = PageType == Comp.CompType.Shader;
+        OnPropertyChanged(nameof(SearchHintText));
+        OnPropertyChanged(nameof(LoadText));
+        OnPropertyChanged(nameof(LoadingText));
+        IsInstallModPackVisible = PageIds == Comp.CompType.ModPack;
+        var isModLike = PageIds is Comp.CompType.Mod or Comp.CompType.ModPack;
+        var isShader = PageIds == Comp.CompType.Shader;
         IsLoaderLabelVisible = isModLike || isShader;
         IsLoaderComboVisible = isModLike;
         IsShaderLoaderComboVisible = isShader;
-        Loader?.name = Lang.Text(
+        UpdateLoaderName();
+    }
+
+    private void UpdateLoaderName()
+    {
+        if (Loader is null)
+            return;
+        Loader.name = Lang.Text(
             "Download.Comp.List.Source.ResourceFetch",
-            Comp.GetCompTypeName(PageType));
+            Comp.GetCompTypeName(PageIds));
+    }
+
+    protected override void OnLanguageChanged()
+    {
+        base.OnLanguageChanged();
+        UpdateLoaderName();
     }
 
     public void ApplySearchContext(string? gameVersion, Comp.CompLoaderType modLoader)
     {
         TargetGameVersion = gameVersion;
         TargetModLoader = modLoader;
-        SearchVersionText = string.IsNullOrEmpty(gameVersion)
-            ? Lang.Text("Download.Comp.Filter.Version.AllInputAvailable")
-            : gameVersion;
+        SearchVersionText = gameVersion ?? string.Empty;
         SearchLoaderIndex = FindLoaderIndex(modLoader);
     }
 
@@ -236,18 +241,6 @@ public partial class PageCompViewModel : ViewModelBase
         CurrentPage = newPage;
         ScrollToTopRequested?.Invoke();
         StartLoad(true);
-    }
-
-    public void RefreshLocalization()
-    {
-        ApplyPageTypeUi();
-        RefreshCategoryOptions();
-        if (Loader is { State: LoadState.Finished })
-        {
-            RenderCurrentPage();
-            ProjectsChanged?.Invoke();
-            StateChanged?.Invoke();
-        }
     }
 
     /// <summary>刷新当前所有条目的收藏图标。</summary>
@@ -387,9 +380,9 @@ public partial class PageCompViewModel : ViewModelBase
             var pageResults = results.Skip(index).Take(PageSize).ToList();
             var showMcVersionDesc = GetGameVersionFilter() is null;
             var showLoaderDesc = GetSelectedModLoader() == Comp.CompLoaderType.Any
-                && PageType is Comp.CompType.Mod or Comp.CompType.ModPack;
+                && PageIds is Comp.CompType.Mod or Comp.CompType.ModPack;
             var showQuickDownload =
-                PageType is not (Comp.CompType.ModPack or Comp.CompType.DataPack);
+                PageIds is not (Comp.CompType.ModPack or Comp.CompType.DataPack);
             var projects = new List<MyCompItemViewModel>(pageResults.Count);
             projects.AddRange(
                 pageResults.Select(project => MyCompItemViewModel.Create(
@@ -413,7 +406,6 @@ public partial class PageCompViewModel : ViewModelBase
 
     private void ApplyPagerState()
     {
-        PageText = Lang.Number(_page + 1, "N0");
         IsPagerVisible = _storage.results.Count > PageSize
             || _storage.curseForgeOffset < _storage.curseForgeTotal
             || _storage.modrinthOffset < _storage.modrinthTotal;
@@ -426,6 +418,7 @@ public partial class PageCompViewModel : ViewModelBase
             || _storage.modrinthOffset < _storage.modrinthTotal;
         RightOpacity = CanGoRight ? 1d : 0.2d;
         CurrentPage = _page;
+        OnPropertyChanged(nameof(PageText));
     }
 
     private void ApplyErrorState()
@@ -436,7 +429,7 @@ public partial class PageCompViewModel : ViewModelBase
 
     internal Comp.CompProjectRequest BuildRequest()
     {
-        var request = new Comp.CompProjectRequest(PageType, _storage, (_page + 1) * PageSize)
+        var request = new Comp.CompProjectRequest(PageIds, _storage, (_page + 1) * PageSize)
         {
             searchText = NormalizeSearchText(SearchText),
             gameVersion = GetGameVersionFilter(),
@@ -447,7 +440,7 @@ public partial class PageCompViewModel : ViewModelBase
         var selectedTag = SearchTagIndex >= 0 && SearchTagIndex < CategoryOptions.Count
             ? CategoryOptions[SearchTagIndex].Tag
             : "";
-        if (PageType == Comp.CompType.Shader)
+        if (PageIds == Comp.CompType.Shader)
         {
             var loaderTag = SearchShaderLoaderIndex >= 0
                 && SearchShaderLoaderIndex < ShaderLoaderTags.Length
@@ -473,10 +466,6 @@ public partial class PageCompViewModel : ViewModelBase
         if (string.Equals(
                 text,
                 Lang.Text("Download.Comp.Filter.Version.Any"),
-                StringComparison.OrdinalIgnoreCase)
-            || string.Equals(
-                text,
-                Lang.Text("Download.Comp.Filter.Version.AllInputAvailable"),
                 StringComparison.OrdinalIgnoreCase))
             return null;
         return text.Contains('.') || text.Contains('w') ? text : null;
@@ -484,7 +473,7 @@ public partial class PageCompViewModel : ViewModelBase
 
     private Comp.CompLoaderType GetSelectedModLoader()
     {
-        if (PageType is not (Comp.CompType.Mod or Comp.CompType.ModPack))
+        if (PageIds is not (Comp.CompType.Mod or Comp.CompType.ModPack))
             return Comp.CompLoaderType.Any;
         var index = Math.Clamp(SearchLoaderIndex, 0, ModLoaderTypes.Length - 1);
         var loaderType = ModLoaderTypes[index];
@@ -545,9 +534,20 @@ public sealed record CompCategoryFilterTag(
     public bool IsGroupHeader => Tag is null;
 }
 
-/// <summary>分类下拉中的一个可显示项。</summary>
-public sealed record CompCategoryFilterOption(
-    string Text,
-    string Tag,
-    bool IsEnabled = true,
-    bool IsIndented = false);
+/// <summary>分类下拉中的一个可显示项；文本按当前语言实时求值。</summary>
+public sealed class CompCategoryFilterOption(
+    string textKey,
+    string tag,
+    bool isEnabled = true,
+    bool isIndented = false)
+{
+    public string TextKey { get; } = textKey;
+
+    public string Text => Lang.Text(TextKey);
+
+    public string Tag { get; } = tag;
+
+    public bool IsEnabled { get; } = isEnabled;
+
+    public bool IsIndented { get; } = isIndented;
+}

@@ -1,9 +1,11 @@
 <ui:MyPageRight xmlns="https://github.com/avaloniaui"
                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:vm="using:PCL"
                 xmlns:ui="using:PCL.UI.Controls"
                 xmlns:loc="using:PCL.Core.UI"
                 x:Class="PCL.Views.Pages.Instance.PageInstanceSetup"
-                x:CompileBindings="False">
+                x:DataType="vm:PageInstanceSetupViewModel"
+                x:CompileBindings="True">
     <ui:MyScrollViewer x:Name="PanBack"
                        HorizontalScrollBarVisibility="Disabled"
                        VerticalScrollBarVisibility="Auto">
@@ -56,7 +58,7 @@
                                        HorizontalAlignment="Stretch"
                                        IsEditable="True"
                                        IsTextSearchEnabled="False"
-                                       HintText="{loc:Loc Instance.Setup.FollowGlobal}"
+                                       HintText="{Binding TitleHintText}"
                                        ToolTip.Tip="{loc:Loc Instance.Setup.Options.WindowTitle.ToolTip}">
                             <ui:MyComboBoxItem Content="{loc:Loc Setup.Launch.Options.WindowTitle.SampleFormat}" />
                         </ui:MyComboBox>

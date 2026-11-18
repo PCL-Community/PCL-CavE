@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
@@ -11,6 +12,7 @@ using PCL.Core.App.Localization;
 using PCL.Core.Logging;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
+using PCL.Navigation;
 using PCL.UI.Controls;
 using PCL.UI.Xaml;
 using PCL.Views.Pages.Homepage;
@@ -52,7 +54,6 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
 
     private bool _communityHintDialogOpen;
 
-    private HomepageContent? _currentContent;
     private DispatcherTimer? _homepageLivePatchTimer;
     private FileSystemWatcher? _homepageLiveWatcher;
     private bool _initialContentPending;
@@ -78,14 +79,10 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
         FileDragHandler.CustomHomepageDropped += _ => ForceRefresh();
 
         _panHint.IsVisible = States.Hint.CEMessage;
-        LocalizedText.TryBind(
-            _labHint1,
-            "Text",
-            () => Lang.Text("Launch.Right.CommunityHint.Message"));
-        LocalizedText.TryBind(
-            _labHint2,
-            "Text",
-            () => Lang.Text("Launch.Right.CommunityHint.HidePrompt"));
+        _labHint1.SetLocalizedValue(TextBlock.TextProperty, "Launch.Right.CommunityHint.Message");
+        _labHint2.SetLocalizedValue(
+            TextBlock.TextProperty,
+            "Launch.Right.CommunityHint.HidePrompt");
         this.FindControl<MyIconButton>("BtnHintClose")!.Click += (_, _) => HideCommunityHint();
 
         _panLog.IsVisible = LauncherCommon.ModeDebug;
@@ -139,7 +136,7 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
             Dispatcher.UIThread.Post(() => _labLog.Text = "");
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
     }
 
@@ -203,6 +200,7 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
                     {
                         // 新下载没有可复用的缓存：按 WPF 行为先清空旧页。
                         _panCustom.Children.Clear();
+                        _panHint.Margin = new Thickness(0d, 0d, 0d, 15d);
                         return;
                     }
 
@@ -295,12 +293,12 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
 
     private void LoadContent(HomepageContent content)
     {
-        _currentContent = content;
         switch (content.Kind)
         {
             case HomepageSourceKind.Blank:
                 LogWrapper.Info("Launch", "[Page] 实例化：清空主页 UI，来源为空");
                 _panCustom.Children.Clear();
+                _panHint.Margin = new Thickness(0d, 0d, 0d, 15d);
                 break;
 
             case HomepageSourceKind.Removed:
@@ -451,19 +449,6 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
         {
             LogWrapper.Debug(ex, "Launch", "显示主页错误弹窗失败");
         }
-    }
-
-    /// <inheritdoc />
-    protected override void RefreshLocalization()
-    {
-        if (_currentContent is not { } content)
-            return;
-        if (content.Kind is not (HomepageSourceKind.CustomXaml or HomepageSourceKind.Trivia))
-            return;
-        if (content.Kind == HomepageSourceKind.CustomXaml
-            && string.IsNullOrWhiteSpace(content.Xaml))
-            return;
-        LoadContent(content);
     }
 
     private object? FindResource(string key)

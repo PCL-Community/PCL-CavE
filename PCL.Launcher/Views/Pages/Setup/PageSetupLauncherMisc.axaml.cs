@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Data;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Localization;
@@ -6,6 +7,7 @@ using PCL.Core.Platform;
 using PCL.Core.UI;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
+using PCL.Navigation;
 using PCL.UI;
 using PCL.UI.Controls;
 
@@ -28,7 +30,18 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
 
         SliderMaxLog.getHintText = new Func<object, object>(FormatMaxLogHint);
         SliderDebugAnim.getHintText = new Func<object, object>(FormatAnimationSpeedHint);
-        RefreshLinuxProtocolAutoText();
+        ComboDebugLinuxProtocolAuto.Bind(
+            ContentControl.ContentProperty,
+            new Binding(nameof(ViewModel.LinuxProtocolAutoText))
+            {
+                Source = ViewModel
+            });
+        ComboDebugLinuxProtocolAuto.Bind(
+            ToolTip.TipProperty,
+            new Binding(nameof(ViewModel.LinuxProtocolAutoToolTip))
+            {
+                Source = ViewModel
+            });
 
         ComboSystemActivity.SelectionChanged += async (_, _) => await OnAnnouncementChangedAsync();
         SliderMaxLog.Change += (_, _) =>
@@ -39,12 +52,11 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
         var supportsProtocol = PlatformRuntime.Current.Capabilities
             .SupportsDisplayProtocolSelection;
         ComboDebugLinuxProtocol.IsEnabled = supportsProtocol;
-        ToolTip.SetTip(
-            ComboDebugLinuxProtocol,
-            Lang.Text(
-                supportsProtocol
-                    ? "Setup.Misc.Debug.LinuxProtocol.ToolTip"
-                    : "Setup.Misc.Debug.LinuxProtocol.OnlyLinux"));
+        ComboDebugLinuxProtocol.SetLocalizedValue(
+            ToolTip.TipProperty,
+            supportsProtocol
+                ? "Setup.Misc.Debug.LinuxProtocol.ToolTip"
+                : "Setup.Misc.Debug.LinuxProtocol.OnlyLinux");
         ToolTip.SetShowOnDisabled(ComboDebugLinuxProtocol, true);
         ComboDebugLinuxProtocol.SelectionChanged += (_, _) =>
         {
@@ -122,7 +134,7 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
         Reload();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack.ScrollToHome();
         if (_loaded) Reload();
@@ -130,13 +142,6 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
 
     public override void OnNavigatedFrom()
     {
-    }
-
-    protected override void RefreshLocalization()
-    {
-        if (!_loaded) return;
-        Reload();
-        RefreshTelemetryToolTip();
     }
 
     public void Reload()
@@ -163,7 +168,6 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
             PanHttpProxyCustom.IsVisible = proxyType == 2;
 
             SliderDebugAnim.Value = Config.Debug.AnimationSpeed;
-            RefreshLinuxProtocolAutoText();
             ComboDebugLinuxProtocol.SelectedIndex =
                 Math.Clamp(Config.Debug.LinuxProtocol, 0, 2);
             CheckDebugSkipCopy.Checked = Config.Debug.DontCopy;
@@ -178,31 +182,20 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
         RefreshTelemetryToolTip();
     }
 
-    private void RefreshLinuxProtocolAutoText()
-    {
-        var resolved = LinuxDisplayProtocolResolver.ResolveAuto();
-        var name = resolved == LinuxDisplayProtocol.Wayland ? "Wayland" : "X11";
-        ComboDebugLinuxProtocolAuto.Content =
-            Lang.Text("Setup.Misc.Debug.LinuxProtocol.Auto", name);
-        ToolTip.SetTip(
-            ComboDebugLinuxProtocolAuto,
-            Lang.Text("Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip", name));
-    }
-
     private void RefreshTelemetryToolTip()
     {
         if (ViewModel.IsBuildUntrusted)
         {
-            ToolTip.SetTip(
-                CheckSystemTelemetry,
-                Lang.Text("Setup.Misc.System.Telemetry.Unavailable"));
+            CheckSystemTelemetry.SetLocalizedValue(
+                ToolTip.TipProperty,
+                "Setup.Misc.System.Telemetry.Unavailable");
             ToolTip.SetShowOnDisabled(CheckSystemTelemetry, true);
         }
         else
         {
-            ToolTip.SetTip(
-                CheckSystemTelemetry,
-                Lang.Text("Setup.Misc.System.Telemetry.ToolTip"));
+            CheckSystemTelemetry.SetLocalizedValue(
+                ToolTip.TipProperty,
+                "Setup.Misc.System.Telemetry.ToolTip");
             ToolTip.SetShowOnDisabled(CheckSystemTelemetry, false);
         }
     }

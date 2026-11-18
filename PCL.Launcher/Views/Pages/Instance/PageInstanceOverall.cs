@@ -1,16 +1,17 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Input;
-using Avalonia.Threading;
 using PCL.Core.App;
+using PCL.Navigation;
 using PCL.UI.Controls;
 using PCL.Views.Pages.Download;
 
 namespace PCL.Views.Pages.Instance;
 
 /// <summary>
-///     实例总览页：顶部展示实例版本条目，随后是实例信息、个性化、文件夹快捷方式与管理动作五张卡片。
-///     个性化卡直接读写实例配置（<see cref="States.Instance" />）；管理卡接入启动、文件补全、核心修补与回收站删除等既有业务。
+/// 实例总览页：顶部展示实例版本条目，随后是实例信息、个性化、文件夹快捷方式与管理动作五张卡片。 个性化卡直接读写实例配置（
+/// <see cref="States.Instance" />）；管理卡接入启动、文件补全、核心修补与回收站删除等既有业务。
 /// </summary>
 public partial class PageInstanceOverall : MyPageRight
 {
@@ -42,20 +43,10 @@ public partial class PageInstanceOverall : MyPageRight
 
     public PageInstanceOverallViewModel ViewModel { get; } = new();
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         ViewModel.SetInstance(InstancePageHelper.ResolveInstance(parameter));
         RefreshOnNavigate();
-    }
-
-    protected override void RefreshLocalization()
-    {
-        var offset = PanScroll?.Offset.Y ?? 0d;
-        Reload();
-        Dispatcher.UIThread.Post(() =>
-        {
-            PanScroll?.Offset = new Vector(PanScroll.Offset.X, offset);
-        });
     }
 
     private void RefreshOnNavigate()
@@ -136,14 +127,27 @@ public partial class PageInstanceOverall : MyPageRight
             }
 
             foreach (var row in ViewModel.InfoRows)
-                PanInfo.Children.Add(
-                    new MyListItem
+            {
+                var item = new MyListItem
+                {
+                    Logo = row.Logo,
+                    Margin = new Thickness(0d, 0d, 2d, 0d)
+                };
+                item.Bind(
+                    MyListItem.TitleProperty,
+                    new Binding(nameof(InstanceInfoRow.Title))
                     {
-                        Title = row.Title,
-                        Info = row.Info,
-                        Logo = row.Logo,
-                        Margin = new Thickness(0d, 0d, 2d, 0d)
+                        Source = row
                     });
+                item.Bind(
+                    MyListItem.InfoProperty,
+                    new Binding(nameof(InstanceInfoRow.Info))
+                    {
+                        Source = row
+                    });
+                PanInfo.Children.Add(item);
+            }
+
             PanInfo.IsVisible = true;
         }
         catch (Exception ex)

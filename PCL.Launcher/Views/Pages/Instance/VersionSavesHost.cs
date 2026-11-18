@@ -4,54 +4,53 @@ using PCL.Navigation;
 
 namespace PCL.Views.Pages.Instance;
 
-/// <summary>
-///     存档管理页宿主（<see cref="PageType.VersionSaves" />）：左栏为存档信息/数据包切换，
-///     右栏按子页种类缓存；导航参数为存档文件夹绝对路径。
-/// </summary>
-public sealed class VersionSavesHost : IPageHost
+/// <summary>存档管理页宿主：左栏为存档信息/数据包切换，右栏按子页描述缓存； 导航参数为存档文件夹绝对路径。</summary>
+public sealed class VersionSavesHost(
+    PageDescriptor descriptor,
+    PageInstanceSavesLeft left,
+    PageViewFactory pageViews) : IPageHost
 {
-    private readonly Dictionary<PageSubType, Control> _rightPages = [];
-    private PageInstanceSavesLeft? _left;
+    private readonly Dictionary<SubPageId, Control> _rightPages = [];
 
-    public PageType Page => PageType.VersionSaves;
+    public PageId Page => PageIds.VersionSaves;
 
     public MainTab? Tab => null;
 
-    public double LeftWidth => 210d;
+    public double LeftWidth => descriptor.LeftWidth;
 
-    public string GetTitle(PageStackData stack)
+    public string GetTitle(PageRoute stack)
     {
-        var saveFolder = stack.Parameter as string
-            ?? PageInstanceSavesLeft.CurrentSave;
+        var saveFolder = stack.Parameter is string routedSave
+            ? routedSave
+            : PageInstanceSavesLeft.CurrentSave;
         var name = GetSaveName(saveFolder);
         return string.IsNullOrEmpty(name)
             ? Lang.Text("Main.Title.SaveManagement", string.Empty)
             : Lang.Text("Main.Title.SaveManagement", name);
     }
 
-    public Control? GetLeft(PageStackData stack)
+    public Control? GetLeft(PageRoute stack)
     {
         ApplySaveFolder(stack);
-        return _left ??= new PageInstanceSavesLeft();
+        return left;
     }
 
-    public Control GetRight(PageStackData stack)
+    public Control GetRight(PageRoute stack)
     {
         ApplySaveFolder(stack);
-        var subType = stack.SubType;
+        var subType = descriptor.NormalizeSubPage(stack.SubPage);
         if (_rightPages.TryGetValue(subType, out var cached))
             return cached;
 
-        Control page = subType switch
-        {
-            PageSubType.VersionSavesDatapack => new PageInstanceSavesDatapack(),
-            _ => new PageInstanceSavesInfo()
-        };
+        var descriptor1 = descriptor.FindSubPage(subType);
+        if (descriptor1 is null)
+            throw new ArgumentOutOfRangeException(nameof(stack), subType, null);
+        var page = pageViews.Create(descriptor1, stack);
         _rightPages[subType] = page;
         return page;
     }
 
-    private static void ApplySaveFolder(PageStackData stack)
+    private static void ApplySaveFolder(PageRoute stack)
     {
         if (stack.Parameter is string { Length: > 0 } saveFolder)
             PageInstanceSavesLeft.CurrentSave = saveFolder;

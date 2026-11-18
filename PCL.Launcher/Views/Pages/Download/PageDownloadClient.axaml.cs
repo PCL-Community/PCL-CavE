@@ -1,16 +1,14 @@
 using System.Text.Json.Nodes;
 using Avalonia.Controls;
 using Avalonia.Threading;
-using PCL.Core.App.Localization;
 using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Download;
 
 /// <summary>
-///     下载页的 Minecraft 版本列表：按正式版、预览版、远古版、愚人节版分组展示，
-///     最新版本置顶；点击版本行把版本文件另存到所选目录，行内悬停按钮提供下载服务端、
-///     更新日志与进入安装页；已安装的版本带标记。
+/// 下载页的 Minecraft 版本列表：按正式版、预览版、远古版、愚人节版分组展示， 最新版本置顶；点击版本行把版本文件另存到所选目录，行内悬停按钮提供下载服务端、
+/// 更新日志与进入安装页；已安装的版本带标记。
 /// </summary>
 public partial class PageDownloadClient : MyPageRight, IPageView, IRefreshable
 {
@@ -34,10 +32,9 @@ public partial class PageDownloadClient : MyPageRight, IPageView, IRefreshable
         Loaded += (_, _) => PanBack?.ScrollToHome();
         GameFolders.McFolderListLoader.PreviewFinish +=
             _ => Dispatcher.UIThread.Post(RefreshInstalledMarks);
-        LocalizationService.LanguageChanged += OnLanguageChanged;
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack?.ScrollToHome();
     }
@@ -73,12 +70,6 @@ public partial class PageDownloadClient : MyPageRight, IPageView, IRefreshable
         }
     }
 
-    private void OnLanguageChanged()
-    {
-        if (GameDownload.dlClientListLoader.State == LoadState.Finished)
-            OnLoadFinished();
-    }
-
     private void OnLoadFinished()
     {
         try
@@ -106,7 +97,7 @@ public partial class PageDownloadClient : MyPageRight, IPageView, IRefreshable
     {
         try
         {
-            PageRouter.Navigate(PageType.Download, PageSubType.DownloadInstall, version);
+            PageRouter.Navigate(PageIds.Download, SubPageIds.DownloadInstall, version);
         }
         catch (Exception ex)
         {

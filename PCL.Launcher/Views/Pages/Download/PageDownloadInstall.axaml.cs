@@ -8,14 +8,15 @@ using PCL.Core.App.Localization;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
 using PCL.Core.Utils.Validate;
+using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Download;
 
 /// <summary>
-///     下载安装页：选择 Minecraft 版本后进入配置阶段，通过 <see cref="InstallLoaderSelector" />
-///     选择 11 种加载器与附属组件，并执行合并安装。提交后立即回到版本选择，进度与取消在下载任务栏。
-///     安装失败或取消后由 <see cref="McInstallRecovery" /> 清理本次安装创建的路径，可用同名实例重试。
+/// 下载安装页：选择 Minecraft 版本后进入配置阶段，通过 <see cref="InstallLoaderSelector" /> 选择 11
+/// 种加载器与附属组件，并执行合并安装。提交后立即回到版本选择，进度与取消在下载任务栏。 安装失败或取消后由 <see cref="McInstallRecovery" />
+/// 清理本次安装创建的路径，可用同名实例重试。
 /// </summary>
 public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
 {
@@ -23,8 +24,8 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
     private readonly InstallLoaderSelector _selector;
     private readonly bool _uiBuilt;
     private readonly PageDownloadInstallViewModel _vm = new();
-    private bool _startingInstall;
     private bool _instanceNameEdited;
+    private bool _startingInstall;
     private bool _updatingInstanceName;
     private JsonObject? _version;
     private string _versionIcon = $"{LauncherPaths.ImageRoot}Icons/NoIcon.png";
@@ -69,7 +70,7 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
         ShowSelectStage();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack?.ScrollToHome();
         _selector.Activate();
@@ -120,23 +121,6 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
             if (_versionListBuilt)
                 OnVersionListFinished();
         });
-    }
-
-    protected override void RefreshLocalization()
-    {
-        if (!_uiBuilt)
-            return;
-        _vm.StartButtonText = Lang.Text("Download.Install.StartDownload");
-        _selector.RefreshLocalization();
-        if (_version is not null)
-        {
-            UpdateWarnings();
-            OnSelectionChanged();
-        }
-
-        if (_versionListBuilt
-            && GameDownload.dlClientListLoader.output.Value?["versions"] is JsonArray)
-            OnVersionListFinished();
     }
 
     /// <summary>退出安装配置阶段，回到版本选择。</summary>
@@ -622,7 +606,7 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
                 newState == LoadState.Aborted
                     ? Lang.Text("Minecraft.Download.Error.InstallationCanceled")
                     : loader.Error?.Message
-                      ?? Lang.Text("Download.Install.Error.OperationFailed")));
+                    ?? Lang.Text("Download.Install.Error.OperationFailed")));
     }
 
     private static void ApplyFinishedBookkeeping(string instanceName)

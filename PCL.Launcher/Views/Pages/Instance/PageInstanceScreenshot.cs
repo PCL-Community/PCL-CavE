@@ -7,13 +7,14 @@ using Avalonia.Media.Imaging;
 using Avalonia.VisualTree;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Hints;
+using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Instance;
 
 /// <summary>
-///     实例截图页：以 MyCard 图片墙展示 <c>screenshots</c> 目录中的截图缩略图，
-///     滚动到底部时按批追加；每张卡片提供打开、复制路径与删除。删除优先移入系统回收站。
+/// 实例截图页：以 MyCard 图片墙展示 <c>screenshots</c> 目录中的截图缩略图，
+/// 滚动到底部时按批追加；每张卡片提供打开、复制路径与删除。删除优先移入系统回收站。
 /// </summary>
 public partial class PageInstanceScreenshot : MyPageRight, IRefreshable
 {
@@ -47,15 +48,10 @@ public partial class PageInstanceScreenshot : MyPageRight, IRefreshable
         Reload();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         ViewModel.SetInstance(InstancePageHelper.ResolveInstance(parameter));
         PanBack.ScrollToHome();
-        Reload();
-    }
-
-    protected override void RefreshLocalization()
-    {
         Reload();
     }
 
@@ -208,7 +204,7 @@ public partial class PageInstanceScreenshot : MyPageRight, IRefreshable
             Height = 25d,
             Margin = new Thickness(6d, 0d)
         };
-        ToolTip.SetTip(button, Lang.Text(textKey));
+        button.SetLocalizedValue(ToolTip.TipProperty, textKey);
         return button;
     }
 

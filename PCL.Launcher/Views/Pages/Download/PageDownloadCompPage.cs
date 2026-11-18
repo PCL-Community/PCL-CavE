@@ -12,7 +12,7 @@ internal sealed class PageDownloadCompPage : MyPageRight, IPageView, IRefreshabl
     {
         _comp = new PageComp
         {
-            PageType = type,
+            PageIds = type,
             SupportModrinth = type != Comp.CompType.World
         };
         _comp.SetCategoryTags(CompCategoryTags.For(type));
@@ -31,7 +31,7 @@ internal sealed class PageDownloadCompPage : MyPageRight, IPageView, IRefreshabl
             autoRun: false);
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         _comp.ScrollViewer.ScrollToHome();
         _comp.RefreshFavoriteStatuses();
@@ -48,9 +48,9 @@ internal sealed class PageDownloadCompPage : MyPageRight, IPageView, IRefreshabl
         _comp.RefreshSearch();
     }
 
-    public void PrepareNavigation(object? parameter)
+    public void PrepareNavigation(PageParameter? parameter)
     {
-        var context = parameter as CompSearchContext;
+        var context = parameter is CompSearchContext searchContext ? searchContext : null;
         if (_comp.IsInitialized)
         {
             if (context is not null && context != _appliedContext)
@@ -70,13 +70,13 @@ internal sealed class PageDownloadCompPage : MyPageRight, IPageView, IRefreshabl
     {
         try
         {
-            if (!PageRegistry.IsRegistered(PageType.CompDetail))
+            if (!PageRegistry.IsRegistered(PageIds.CompDetail))
             {
                 LauncherCommon.Log($"资源详情页未注册，无法打开 {context.Project?.Slug}");
                 return;
             }
 
-            PageRouter.Navigate(PageType.CompDetail, PageSubType.Default, context);
+            PageRouter.Navigate(PageIds.CompDetail, null, context);
         }
         catch (Exception ex)
         {

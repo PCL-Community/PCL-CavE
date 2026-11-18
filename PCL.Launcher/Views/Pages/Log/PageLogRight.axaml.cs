@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using PCL.Core.App.Localization;
 using PCL.Core.Logging;
 using PCL.Core.UI.Theme;
+using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Log;
@@ -36,6 +37,11 @@ public partial class PageLogRight : MyPageRight, IRefreshable
         BtnOperationExportStackDump.Click += (_, _) => _ = ViewModel.ExportStackDumpAsync();
         SliderMaxLog.Change += (_, _) => ViewModel.MaxLogLines = SliderMaxLog.Value;
         SliderMaxLog.getHintText = PageLogRightViewModel.GetMaxLogHintText;
+        ViewModel.PropertyChanged += (_, args) =>
+        {
+            if (string.IsNullOrEmpty(args.PropertyName))
+                RefreshCounters();
+        };
         DetachedFromVisualTree += (_, _) =>
         {
             _refreshed = false;
@@ -54,7 +60,7 @@ public partial class PageLogRight : MyPageRight, IRefreshable
         ReloadContent();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         if (_refreshed)
         {
@@ -69,11 +75,6 @@ public partial class PageLogRight : MyPageRight, IRefreshable
     public override void OnNavigatedFrom()
     {
         UnsubscribeCurrentLog();
-    }
-
-    protected override void RefreshLocalization()
-    {
-        ReloadContent();
     }
 
     #region 渲染
@@ -147,7 +148,8 @@ public partial class PageLogRight : MyPageRight, IRefreshable
             {
                 Text = line.Text,
                 TextWrapping = TextWrapping.Wrap,
-                FontFamily = new FontFamily("Consolas,Menlo,DejaVu Sans Mono,Liberation Mono,monospace"),
+                FontFamily = new FontFamily(
+                    "Consolas,Menlo,DejaVu Sans Mono,Liberation Mono,monospace"),
                 FontSize = 14d,
                 Foreground = GetLevelBrush(line.Level)
             }
