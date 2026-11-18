@@ -3,6 +3,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using PCL.Core.Logging;
+using PCL.Core.UI.Dialogs;
 using PCL.UI.Controls;
 using PCL.UI.SystemIntegration;
 using PCL.Views.Pages;
@@ -302,6 +303,9 @@ public static class PageRouter
             () =>
             {
                 if (!page.IsEffectivelyVisible) return;
+                if (DialogService.Instance.IsShowing
+                    || DialogService.Instance.HasPending)
+                    return;
                 var target = page
                     .GetVisualDescendants()
                     .OfType<Control>()
