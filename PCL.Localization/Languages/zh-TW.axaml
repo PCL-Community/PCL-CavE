@@ -1,9 +1,8 @@
 <!-- Formatted by xaml-lang-formatter at 2026-06-28T17:16:52. -->
-<ResourceDictionary
-    xmlns="https://github.com/avaloniaui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
-    xml:space="preserve">
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+                    xml:space="preserve">
 
     <!-- Meta -->
 
@@ -61,22 +60,8 @@
 
     <!-- Main.Menu -->
 
-    <sys:String x:Key="Main.Menu.File">檔案</sys:String>
-    <sys:String x:Key="Main.Menu.Edit">編輯</sys:String>
-    <sys:String x:Key="Main.Menu.Window">視窗</sys:String>
     <sys:String x:Key="Main.Menu.Help">說明</sys:String>
-    <sys:String x:Key="Main.Menu.About">關於 PCL CE</sys:String>
-    <sys:String x:Key="Main.Menu.Preferences">設定…</sys:String>
-    <sys:String x:Key="Main.Menu.Hide">隱藏 PCL CE</sys:String>
-    <sys:String x:Key="Main.Menu.Quit">結束 PCL CE</sys:String>
-    <sys:String x:Key="Main.Menu.CloseWindow">關閉視窗</sys:String>
     <sys:String x:Key="Main.Menu.Minimize">最小化</sys:String>
-    <sys:String x:Key="Main.Menu.Undo">復原</sys:String>
-    <sys:String x:Key="Main.Menu.Redo">重做</sys:String>
-    <sys:String x:Key="Main.Menu.Cut">剪下</sys:String>
-    <sys:String x:Key="Main.Menu.Copy">複製</sys:String>
-    <sys:String x:Key="Main.Menu.Paste">貼上</sys:String>
-    <sys:String x:Key="Main.Menu.SelectAll">全選</sys:String>
 
     <!-- Common.Action -->
 
@@ -2178,6 +2163,9 @@
     <sys:String x:Key="Minecraft.Launch.Donate.Title">{0} 次啟動！</sys:String>
     <sys:String x:Key="Minecraft.Launch.ExportScript.Cancelled">已取消匯出啟動指令碼！</sys:String>
     <sys:String x:Key="Minecraft.Launch.ExportScript.Success">匯出啟動指令碼成功！</sys:String>
+    <sys:String x:Key="Minecraft.Launch.Script.Title">啟動 - {0}</sys:String>
+    <sys:String x:Key="Minecraft.Launch.Script.Starting">遊戲正在啟動，請稍候。</sys:String>
+    <sys:String x:Key="Minecraft.Launch.Script.Exited">遊戲已退出。</sys:String>
     <sys:String x:Key="Minecraft.Launch.PurchaseHint.Later">下次一定</sys:String>
     <sys:String x:Key="Minecraft.Launch.PurchaseHint.Message">看起來你似乎沒買游戲...&#xA;如果覺得 Minecraft 還不錯，可以購買支援一下，畢竟開發遊戲也真的很不容易...不要一直接嫖啦。&#xA;&#xA;在驗證一個微軟帳戶後，就不會出現這個提示了！</sys:String>
     <sys:String x:Key="Minecraft.Launch.PurchaseHint.Purchase">支援！</sys:String>
@@ -2927,9 +2915,9 @@
 
     <sys:String x:Key="Setup.Misc.Debug.AnimationSpeed">動畫速度</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol">Linux 顯示協定</sys:String>
-    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto">自動（X11）</sys:String>
+    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto">自動（{0}）</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.ToolTip">選擇 Linux 下使用的顯示協定，修改後需要重啟啟動器。&#xA;使用環境變數 PCL_FORCE_X11 或 PCL_USE_WAYLAND 將會覆蓋此設定。</sys:String>
-    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip">跟隨啟動器預設值（X11）。</sys:String>
+    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip">跟隨啟動器預設值（{0}）。</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.X11.ToolTip">使用 X11/XWayland 顯示。目前相容性和幀率最穩定，推薦保持。</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Wayland.ToolTip">使用原生 Wayland 顯示。實驗性，可能出現動畫卡頓或視窗行為差異。</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Restart">顯示協定已儲存，需要重啟啟動器後生效。</sys:String>
@@ -2960,6 +2948,7 @@
     <sys:String x:Key="Setup.Misc.Network.Proxy.Password">密碼</sys:String>
     <sys:String x:Key="Setup.Misc.Network.Proxy.System">使用系統 Proxy</sys:String>
     <sys:String x:Key="Setup.Misc.Network.Proxy.UntrustedWarning">請勿填寫不信任的 Proxy 位址</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.Proxy.CustomHint">例如 http://127.0.0.1:1080/</sys:String>
     <sys:String x:Key="Setup.Misc.Network.Proxy.Username">帳戶</sys:String>
 
     <!-- Setup.Misc.System -->
@@ -3062,7 +3051,6 @@
     <sys:String x:Key="Setup.Ui.Basic.LockWindow">鎖定啟動器大小</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Opacity">不透明度</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Opacity2">不透明度</sys:String>
-    <sys:String x:Key="Setup.Ui.Basic.ShowLogo">開啟啟動器時顯示 PCL CE 圖示</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.ShowTriviaHint">在啟動遊戲時顯示"你知道嗎"</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Title">基礎</sys:String>
 
@@ -3210,8 +3198,8 @@
     <sys:String x:Key="Setup.Update.CheckAgain">再次檢查</sys:String>
     <sys:String x:Key="Setup.Update.CheckFailed">檢查更新時出錯</sys:String>
     <sys:String x:Key="Setup.Update.Checking">正在檢查更新...</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">下載 .NET 10 執行時</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.Message">發現了啟動器更新（版本 {0}），但是新版本要求你的電腦安裝 .NET 10 才可以執行。&#xA;你需要先安裝 .NET 10 才可以繼續更新。&#xA;&#xA;點擊下方按鈕開啟網頁，然後選擇「.NET 桌面執行時」中的 {1} 選項下載。</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">下載 .NET 11 執行時</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.Message">發現了啟動器更新（版本 {0}），但是新版本要求你的電腦安裝 .NET 11 才可以執行。&#xA;你需要先安裝 .NET 11 才可以繼續更新。&#xA;&#xA;點擊下方按鈕開啟網頁，然後選擇「.NET 桌面執行時」中的 {1} 選項下載。</sys:String>
     <sys:String x:Key="Setup.Update.DotNetMissing.Title">啟動器更新 - 缺少執行環境</sys:String>
     <sys:String x:Key="Setup.Update.Error.NetworkFailed">無法取得最新版本資訊，請檢查網路連線</sys:String>
     <sys:String x:Key="Setup.Update.Install">下載並安裝</sys:String>
@@ -3280,7 +3268,7 @@
     <sys:String x:Key="SystemDialog.File.SelectTitle">選擇檔案</sys:String>
     <sys:String x:Key="SystemDialog.Folder.OpenFailed.Message">無法開啟檔案總管。請嘗試關閉安全軟體（例如 360 安全衛士）。&#xA;&#xA;路徑：{0}</sys:String>
     <sys:String x:Key="SystemDialog.Folder.SelectTitle">選擇資料夾</sys:String>
-    <sys:String x:Key="SystemDialog.Startup.DotNetRuntimeOutdated.Message">你的 .NET 桌面執行時已過期或損壞。請重新安裝 .NET 10。</sys:String>
+    <sys:String x:Key="SystemDialog.Startup.DotNetRuntimeOutdated.Message">你的 .NET 桌面執行時已過期或損壞。請重新安裝 .NET 11。</sys:String>
     <sys:String x:Key="SystemDialog.Startup.InitializationTitle">PCL CE 初始化失敗</sys:String>
 
     <!-- SystemDialog.Error -->
@@ -3288,7 +3276,7 @@
     <sys:String x:Key="SystemDialog.Error.Detail.WithException">{0}&#xA;&#xA;詳細資訊：&#xA;{1}</sys:String>
     <sys:String x:Key="SystemDialog.Error.Message.WithLogExportGuidance">{0}&#xA;&#xA;若要尋求幫助，請不要關閉啟動器。請立即匯出日誌（設定 → 檢視日誌 → 匯出日誌），並傳送匯出的日誌壓縮檔；僅傳送此視窗的截圖通常無法幫助定位問題。</sys:String>
     <sys:String x:Key="SystemDialog.Error.OperationFailed.Message">執行操作時發生錯誤。&#xA;&#xA;操作資訊：&#xA;{0}&#xA;&#xA;詳細資訊：&#xA;{1}</sys:String>
-    <sys:String x:Key="SystemDialog.Error.OperationFailed.RuntimeMessage">執行操作時發生錯誤。&#xA;&#xA;操作資訊：&#xA;{0}&#xA;&#xA;詳細資訊：&#xA;{1}&#xA;&#xA;與系統底層互動失敗。請嘗試重新安裝 .NET 10。</sys:String>
+    <sys:String x:Key="SystemDialog.Error.OperationFailed.RuntimeMessage">執行操作時發生錯誤。&#xA;&#xA;操作資訊：&#xA;{0}&#xA;&#xA;詳細資訊：&#xA;{1}&#xA;&#xA;與系統底層互動失敗。請嘗試重新安裝 .NET 11。</sys:String>
     <sys:String x:Key="SystemDialog.Error.Title">錯誤</sys:String>
     <sys:String x:Key="SystemDialog.Error.Unexpected.Message">發生意外錯誤。</sys:String>
     <sys:String x:Key="SystemDialog.Error.Unexpected.Title">發生意外錯誤</sys:String>
@@ -3612,7 +3600,6 @@
 
     <sys:String x:Key="Tools.Test.Dependency.MissingTitle">缺少依賴</sys:String>
     <sys:String x:Key="Instance.Export.Task.Prefix">匯出實例</sys:String>
-    <sys:String x:Key="Application.Loading.Status.Preparing">Preparing</sys:String>
     <sys:String x:Key="Download.Feature.Migrating">Migrating</sys:String>
     <sys:String x:Key="Download.Feature.Migrating.Description">Migrating download data, please wait.</sys:String>
     <sys:String x:Key="Download.Install.Finished">Installation finished</sys:String>

@@ -13,8 +13,8 @@ using PCL.UI.Controls;
 namespace PCL.Views.Pages.Tools;
 
 /// <summary>
-///     联机大厅页：公告、协议、账号与 NAT/EasyTier 状态、世界发现及大厅生命周期。
-///     状态与后端交互由 <see cref="PageToolsGameLinkViewModel" /> 持有，本文件只负责控件事件与剪贴板。
+/// 联机大厅页：公告、协议、账号与 NAT/EasyTier 状态、世界发现及大厅生命周期。 状态与后端交互由
+/// <see cref="PageToolsGameLinkViewModel" /> 持有，本文件只负责控件事件与剪贴板。
 /// </summary>
 public partial class PageToolsGameLink : MyPageRight
 {
@@ -130,13 +130,17 @@ public partial class PageToolsGameLink : MyPageRight
         StackPlayerList.Children.Clear();
         foreach (var row in ViewModel.PlayerRows)
         {
-            var placeholder = new MyVirtualizingElement<MyListItem>(() => new MyListItem
+            var placeholder = new MyVirtualizingElement<MyListItem>(() =>
             {
-                Title = row.Name,
-                Info = row.Info,
-                SvgIcon = "lucide/user",
-                Type = MyListItem.CheckType.Clickable,
-                Command = row.ShowInfoCommand
+                var item = new MyListItem
+                {
+                    Title = row.Name,
+                    SvgIcon = "lucide/user",
+                    Type = MyListItem.CheckType.Clickable,
+                    Command = row.ShowInfoCommand
+                };
+                LocalizedText.Bind(item, MyListItem.InfoProperty, () => row.Info);
+                return item;
             })
             {
                 Height = 42d,
@@ -149,12 +153,6 @@ public partial class PageToolsGameLink : MyPageRight
     public void Reload()
     {
         ViewModel.Reload();
-    }
-
-    protected override void RefreshLocalization()
-    {
-        ViewModel.RefreshLocalization();
-        UpdateLoadState();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -246,8 +244,7 @@ public partial class PageToolsGameLink : MyPageRight
                         DialogButton.Create(
                             Lang.Text("Common.Action.Copy"),
                             () => _ = _CopyTextAsync(ip)),
-                        DialogButton.Create(Lang.Text("Tools.GameLink.CopyIp.Back"))),
-                    ForceWait = true
+                        DialogButton.Create(Lang.Text("Tools.GameLink.CopyIp.Back")))
                 });
         }
         catch (Exception ex)

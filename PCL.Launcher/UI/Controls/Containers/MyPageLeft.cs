@@ -1,19 +1,16 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
-using PCL.Core.App.Localization;
 using PCL.Navigation;
 using PCL.Views.Pages;
-using static PCL.Animations;
 
 namespace PCL.UI.Controls;
 
 /// <summary>
-///     页面左栏容器：为 <see cref="AnimatedControl" /> 中的按钮与列表项生成逐个进入/退出动画；
-///     未设置 <see cref="AnimatedControl" /> 时退化为整栏缩放淡入。
-///     语言切换后 <see cref="RefreshLocalization" /> 会在下次加载时重刷页面文本。
+/// 页面左栏容器：为 <see cref="AnimatedControl" /> 中的按钮与列表项生成逐个进入/退出动画； 未设置
+/// <see cref="AnimatedControl" /> 时退化为整栏缩放淡入。
 /// </summary>
-public class MyPageLeft : Grid, IPageView
+public class MyPageLeft : Grid, IPageView, IPageLeftContainer
 {
     public static readonly StyledProperty<Control?> AnimatedControlProperty =
         AvaloniaProperty.Register<MyPageLeft, Control?>(nameof(AnimatedControl));
@@ -21,12 +18,10 @@ public class MyPageLeft : Grid, IPageView
     private readonly int _uuid = LauncherCommon.GetUuid();
 
     private bool _animatedControlNullWarned;
-    private int _localizationRevision = LocalizationService.UiRevision;
 
     public MyPageLeft()
     {
         ContainerTheme.AttachStyles(this);
-        Loaded += (_, _) => RefreshLocalizationIfStale();
     }
 
     protected INavigationService Navigation => PageRouter.Navigation;
@@ -49,38 +44,6 @@ public class MyPageLeft : Grid, IPageView
         set => SetValue(AnimatedControlProperty, value);
     }
 
-    public virtual void OnNavigatedTo(object? parameter)
-    {
-    }
-
-    public virtual void OnNavigatedFrom()
-    {
-    }
-
-    private void RefreshLocalizationIfStale()
-    {
-        if (_localizationRevision == LocalizationService.UiRevision)
-            return;
-        _localizationRevision = LocalizationService.UiRevision;
-        try
-        {
-            RefreshLocalization();
-        }
-        catch (Exception ex)
-        {
-            LauncherCommon.Log(ex, "刷新页面本地化文本失败");
-        }
-    }
-
-    protected virtual void RefreshLocalization()
-    {
-    }
-
-    public void ApplyLocalizationChanged()
-    {
-        RefreshLocalizationIfStale();
-    }
-
     public void TriggerShowAnimation()
     {
         var animationKey = "PageLeft PageChange " + _uuid;
@@ -91,7 +54,7 @@ public class MyPageLeft : Grid, IPageView
             var scale = ContainerAnimation.EnsureScale(this, 0.96d, 0.96d);
             if (!ContainerAnimation.CanAnimatePage(this))
             {
-                AniStop(animationKey);
+                AnimationService.CancelAnimationByName(animationKey);
                 scale.ScaleX = 1d;
                 scale.ScaleY = 1d;
                 Opacity = 1d;
@@ -99,14 +62,14 @@ public class MyPageLeft : Grid, IPageView
             }
 
             Opacity = 0d;
-            AniStart(
-                new List<AniData>
+            AnimationService.Run(
+                new List<IAnimation>
                 {
-                    AaScaleTransform(
+                    new ScaleTransformAnimation(
                         this,
                         1d - scale.ScaleX,
-                        ease: new AniEaseOutBack(AniEasePower.Weak)),
-                    AaOpacity(this, 1d, 100)
+                        ease: new BackEaseWithPowerOut(EasePower.Weak)),
+                    new OpacityAnimation(this, 1d, 100)
                 },
                 animationKey);
             return;
@@ -114,7 +77,7 @@ public class MyPageLeft : Grid, IPageView
 
         if (!ContainerAnimation.CanAnimatePage(this))
         {
-            AniStop(animationKey);
+            AnimationService.CancelAnimationByName(animationKey);
             foreach (var element in GetAllAnimControls(true))
             {
                 element.Opacity = element is TextBlock ? 0.6d : 1d;
@@ -129,7 +92,7 @@ public class MyPageLeft : Grid, IPageView
             return;
         }
 
-        var aniList = new List<AniData>();
+        var aniList = new List<IAnimation>();
         var id = 0;
         var delay = 0;
         foreach (var element in GetAllAnimControls(true))
@@ -147,23 +110,23 @@ public class MyPageLeft : Grid, IPageView
                 if (element is MyListItem listItem)
                     listItem.HoverAnimationEnabled = false;
                 aniList.Add(
-                    AaOpacity(
+                    new OpacityAnimation(
                         element,
                         element is TextBlock ? 0.6d : 1d,
                         100,
                         delay,
-                        new AniEaseOutFluent(AniEasePower.Weak)));
-                aniList.Add(AaTranslateX(element, 5d, 200, delay, new AniEaseOutFluent()));
+                        new FluentEaseOut(EasePower.Weak)));
+                aniList.Add(new TranslateXAnimation(element, 5d, 200, delay, new FluentEaseOut()));
                 aniList.Add(
-                    AaTranslateX(
+                    new TranslateXAnimation(
                         element,
                         20d,
                         300,
                         delay,
-                        new AniEaseOutBack(AniEasePower.Weak)));
+                        new BackEaseWithPowerOut(EasePower.Weak)));
                 if (element is MyListItem item)
                     aniList.Add(
-                        AaCode(
+                        new ActionAnimation(
                             () =>
                             {
                                 item.HoverAnimationEnabled = true;
@@ -174,7 +137,7 @@ public class MyPageLeft : Grid, IPageView
                 id += 1;
             }
 
-        AniStart(aniList, animationKey);
+        AnimationService.Run(aniList, animationKey);
     }
 
     public void TriggerHideAnimation()
@@ -187,22 +150,22 @@ public class MyPageLeft : Grid, IPageView
             var scale = ContainerAnimation.EnsureScale(this);
             if (!ContainerAnimation.CanAnimatePage(this))
             {
-                AniStop(animationKey);
+                AnimationService.CancelAnimationByName(animationKey);
                 scale.ScaleX = 1d;
                 scale.ScaleY = 1d;
                 Opacity = 0d;
                 return;
             }
 
-            AniStart(
-                new List<AniData>
+            AnimationService.Run(
+                new List<IAnimation>
                 {
-                    AaScaleTransform(
+                    new ScaleTransformAnimation(
                         this,
                         0.95d - scale.ScaleX,
                         110,
-                        ease: new AniEaseInFluent(AniEasePower.Weak)),
-                    AaOpacity(this, -Opacity, 80, 30)
+                        ease: new FluentEaseIn(EasePower.Weak)),
+                    new OpacityAnimation(this, -Opacity, 80, 30)
                 },
                 animationKey);
             return;
@@ -212,7 +175,7 @@ public class MyPageLeft : Grid, IPageView
 
         if (!ContainerAnimation.CanAnimatePage(this) || controls.Count == 0)
         {
-            AniStop(animationKey);
+            AnimationService.CancelAnimationByName(animationKey);
             foreach (var element in controls)
             {
                 element.Opacity = 0d;
@@ -223,18 +186,26 @@ public class MyPageLeft : Grid, IPageView
             return;
         }
 
-        var aniList = new List<AniData>();
+        var aniList = new List<IAnimation>();
         var id = 0;
         foreach (var element in controls)
         {
             var delay = (int)Math.Round(70d / controls.Count * id);
-            aniList.Add(AaOpacity(element, -element.Opacity, 50, delay));
-            aniList.Add(AaTranslateX(element, -6d, 50, delay));
+            aniList.Add(new OpacityAnimation(element, -element.Opacity, 50, delay));
+            aniList.Add(new TranslateXAnimation(element, -6d, 50, delay));
             id += 1;
         }
 
-        aniList.Add(AaCode(() => RestoreListItemHover(controls), after: true));
-        AniStart(aniList, animationKey);
+        aniList.Add(new ActionAnimation(() => RestoreListItemHover(controls), true));
+        AnimationService.Run(aniList, animationKey);
+    }
+
+    public virtual void OnNavigatedTo(PageParameter? parameter)
+    {
+    }
+
+    public virtual void OnNavigatedFrom()
+    {
     }
 
     private static void RestoreListItemHover(IEnumerable<Control> controls)

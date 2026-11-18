@@ -7,16 +7,13 @@ using Avalonia.Media;
 using Avalonia.Metadata;
 using Avalonia.Threading;
 using PCL.Core.App.Configuration;
-using PCL.Core.App.Localization;
 using PCL.Core.UI.Theme;
-using PCL.UI.Controls.Common;
 
 namespace PCL.UI.Controls;
 
 /// <summary>
-///     内联提示条：左侧色条按 <see cref="Theme" /> 取红/黄/蓝三档颜色，正文支持
-///     <see cref="Inlines" /> 富文本；可选的关闭按钮会写入 <see cref="RelativeSetup" />
-///     对应的配置项并收起提示条。
+/// 内联提示条：左侧色条按 <see cref="Theme" /> 取红/黄/蓝三档颜色，正文支持 <see cref="Inlines" />
+/// 富文本；可选的关闭按钮会写入 <see cref="RelativeSetup" /> 对应的配置项并收起提示条。
 /// </summary>
 public class MyHint : Border
 {
@@ -46,7 +43,7 @@ public class MyHint : Border
 
     public MyHint()
     {
-        using var controlScope = PCL.Animations.SuspendControl();
+        using var controlScope = AnimationService.SuspendControl();
 
         CornerRadius = new CornerRadius(2d);
         BorderThickness = new Thickness(3d, 0d, 0d, 0d);
@@ -57,8 +54,7 @@ public class MyHint : Border
             Name = "LabText",
             IsHitTestVisible = false,
             LineHeight = 16d,
-            Margin = new Thickness(0d, 0d, 0d, -1d),
-            Padding = new Thickness(12d, 9d),
+            Padding = new Thickness(12d, 6d, 12d, 12d),
             VerticalAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.Wrap
         };
@@ -76,7 +72,7 @@ public class MyHint : Border
             Focusable = false,
             Cursor = new Cursor(StandardCursorType.Hand)
         };
-        ToolTip.SetTip(_btnClose, Lang.Text("Common.Hint.DoNotShowAgain"));
+        _btnClose.SetLocalizedValue(ToolTip.TipProperty, "Common.Hint.DoNotShowAgain");
         _btnClose.Click += (_, _) => _OnCloseClick();
 
         var grid = new Grid
@@ -103,7 +99,7 @@ public class MyHint : Border
         {
             _unwatchTheme?.Invoke();
             _unwatchTheme = null;
-            PCL.Animations.AniStop(DisposeKey);
+            AnimationService.CancelAnimationByName(DisposeKey);
         };
 
         PointerReleased += _OnPointerReleased;
@@ -123,13 +119,13 @@ public class MyHint : Border
         };
 
         var tone = ThemeService.CurrentTone;
-        var background = new MyColor().FromHsl2(hue, 90d, tone.L7 * 100d);
-        var foreground = new MyColor().FromHsl2(hue, 90d, tone.L2 * 100d);
+        var background = NColor.FromHsl2(hue, 90d, tone.L7 * 100d);
+        var foreground = NColor.FromHsl2(hue, 90d, tone.L2 * 100d);
 
-        Background = new SolidColorBrush((Color)background);
-        BorderBrush = new SolidColorBrush((Color)foreground);
-        _labText.Foreground = new SolidColorBrush((Color)foreground);
-        _btnClose.Foreground = new SolidColorBrush((Color)foreground);
+        Background = new SolidColorBrush(background);
+        BorderBrush = new SolidColorBrush(foreground);
+        _labText.Foreground = new SolidColorBrush(foreground);
+        _btnClose.Foreground = new SolidColorBrush(foreground);
         _btnClose.RefreshAnim();
 
         // 读取 HasBorder 会按当前上边框判断是否补齐其余三边
@@ -184,9 +180,7 @@ public class MyHint : Border
 
     #region 文本
 
-    /// <summary>
-    ///     提示条正文的内联集合；XAML 中直接写在 <c>MyHint</c> 内的文本作为内联内容。
-    /// </summary>
+    /// <summary>提示条正文的内联集合；XAML 中直接写在 <c>MyHint</c> 内的文本作为内联内容。</summary>
     [Content]
     public InlineCollection Inlines => _labText.Inlines!;
 
@@ -206,9 +200,7 @@ public class MyHint : Border
         set => _btnClose.IsVisible = value;
     }
 
-    /// <summary>
-    ///     关联的配置项键；配置项已存在用户值时不再显示提示条，点击关闭按钮会写入该配置项。
-    /// </summary>
+    /// <summary>关联的配置项键；配置项已存在用户值时不再显示提示条，点击关闭按钮会写入该配置项。</summary>
     public string RelativeSetup { get; set; } = string.Empty;
 
     private string DisposeKey => FeedbackAnimation.Name("MyHint Dispose", Uuid);
@@ -231,9 +223,7 @@ public class MyHint : Border
         Close();
     }
 
-    /// <summary>
-    ///     关闭提示条：轻微缩小、淡出、高度收拢后隐藏；动画关闭或已不可交互时立即隐藏。
-    /// </summary>
+    /// <summary>关闭提示条：轻微缩小、淡出、高度收拢后隐藏；动画关闭或已不可交互时立即隐藏。</summary>
     /// <param name="callBack">收起完成后在 UI 线程执行的回调，参数为本提示条。</param>
     public void AniDispose(Action<MyHint>? callBack = null)
     {
@@ -248,7 +238,7 @@ public class MyHint : Border
 
         _isClosing = true;
 
-        PCL.Animations.AniDispose(
+        AnimationService.DisposeControl(
             this,
             false,
             _ => callBack?.Invoke(this),

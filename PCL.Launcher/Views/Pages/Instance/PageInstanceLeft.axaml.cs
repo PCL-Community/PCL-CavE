@@ -1,19 +1,15 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
-using PCL.Core.App.Localization;
 using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Instance;
 
-/// <summary>
-///     实例设置页左栏：按实例能力与隐藏开关列出设置子页，点击通过路由切换右栏；
-///     设置、安装、导出、存档、截图、资源与服务器项带有行内初始化/刷新按钮。
-/// </summary>
+/// <summary>实例设置页左栏：按实例能力与隐藏开关列出设置子页，点击通过路由切换右栏； 设置、安装、导出、存档、截图、资源与服务器项带有行内初始化/刷新按钮。</summary>
 public partial class PageInstanceLeft : MyPageLeft, IRefreshable
 {
-    private readonly List<(PageSubType SubType, MyListItem Item)> _items = [];
+    private readonly List<(SubPageId SubPage, MyListItem Item)> _items = [];
     private bool _isBuilding;
     private bool _resetting;
 
@@ -44,7 +40,7 @@ public partial class PageInstanceLeft : MyPageLeft, IRefreshable
         PageInstanceLeftViewModel.SetCurrentInstance(instance);
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         if (ViewModel.NavigateTo(parameter))
             BuildItems();
@@ -53,12 +49,6 @@ public partial class PageInstanceLeft : MyPageLeft, IRefreshable
 
     public override void OnNavigatedFrom()
     {
-    }
-
-    protected override void RefreshLocalization()
-    {
-        ViewModel.RequestRefresh();
-        RefreshOnNavigate();
     }
 
     /// <summary>实例分类或 Mod 可用性变化后重建左栏。</summary>
@@ -90,7 +80,7 @@ public partial class PageInstanceLeft : MyPageLeft, IRefreshable
             {
                 if (entry.IsSection)
                 {
-                    PanItem.Children.Add(CreateSectionTitle(entry.SectionTitle!));
+                    PanItem.Children.Add(CreateSectionTitle(entry.SectionTitleKey!));
                     continue;
                 }
 
@@ -113,15 +103,15 @@ public partial class PageInstanceLeft : MyPageLeft, IRefreshable
             MinPaddingRight = 35,
             Height = 36,
             VerticalAlignment = VerticalAlignment.Top,
-            Title = Lang.Text(definition.TitleKey),
             SvgIcon = definition.SvgIcon,
             LogoScale = definition.LogoScale,
-            Tag = definition.SubType,
+            Tag = definition.SubPage,
             IsVisible = definition.IsVisible
         };
+        item.SetLocalizedValue(MyListItem.TitleProperty, definition.TitleKey);
         item.Check += (sender, _) =>
         {
-            if (!_isBuilding && sender is MyListItem { Tag: PageSubType target })
+            if (!_isBuilding && sender is MyListItem { Tag: SubPageId target })
                 PageInstanceLeftViewModel.ChangePage(target);
         };
 
@@ -133,7 +123,7 @@ public partial class PageInstanceLeft : MyPageLeft, IRefreshable
                 SvgIcon = "lucide/rotate-ccw",
                 LogoScale = 0.9d
             };
-            ToolTip.SetTip(reset, Lang.Text("Common.Action.Initialize"));
+            reset.SetLocalizedValue(ToolTip.TipProperty, "Common.Action.Initialize");
             reset.Click += (_, _) => _ = ResetInstanceSettingsAsync();
             buttons.Add(reset);
         }
@@ -145,7 +135,7 @@ public partial class PageInstanceLeft : MyPageLeft, IRefreshable
                 SvgIcon = "lucide/refresh-cw",
                 LogoScale = 0.85d
             };
-            ToolTip.SetTip(refreshButton, Lang.Text("Common.Action.Refresh"));
+            refreshButton.SetLocalizedValue(ToolTip.TipProperty, "Common.Action.Refresh");
             refreshButton.Click += (_, _) => PageInstanceLeftViewModel.RefreshSubPage(refresh);
             buttons.Add(refreshButton);
         }
@@ -153,20 +143,21 @@ public partial class PageInstanceLeft : MyPageLeft, IRefreshable
         if (buttons.Count > 0)
             item.Buttons = [.. buttons];
 
-        _items.Add((definition.SubType, item));
+        _items.Add((definition.SubPage, item));
         PanItem.Children.Add(item);
         return item;
     }
 
-    private static TextBlock CreateSectionTitle(string text)
+    private static TextBlock CreateSectionTitle(string titleKey)
     {
         // WPF 实例左栏使用 13,6,5,4；共享 SectionTitle 的 18 上边距用于其它页面，这里局部覆盖。
         var title = new TextBlock
         {
-            Text = text,
             Margin = new Thickness(13d, 6d, 5d, 4d)
         };
         title.Classes.Add("SectionTitle");
+        if (!string.IsNullOrEmpty(titleKey))
+            title.SetLocalizedValue(TextBlock.TextProperty, titleKey);
         return title;
     }
 
@@ -175,7 +166,7 @@ public partial class PageInstanceLeft : MyPageLeft, IRefreshable
         _isBuilding = true;
         try
         {
-            var current = PageInstanceLeftViewModel.CurrentSubType;
+            var current = PageInstanceLeftViewModel.CurrentSubPage;
             foreach (var (subType, item) in _items)
                 if (item.IsVisible)
                     item.Checked = subType == current;

@@ -9,21 +9,18 @@ using Avalonia.VisualTree;
 using PCL.Core.App;
 using PCL.Core.UI.Theme;
 using PCL.Navigation;
-using PCL.UI.Animations;
 using PCL.UI.Controls;
-using static PCL.Animations;
 
 namespace PCL.Views.Shell;
 
-/// <summary>
-///     自绘标题栏：左侧 Logo 与四个主入口，二级页面显示返回键与标题，右侧为窗口按钮。
-///     Logo 模式、自定义文本与左右布局由配置与主题驱动，文本全部走本地化。
-/// </summary>
+/// <summary>自绘标题栏：左侧 Logo 与四个主入口，二级页面显示返回键与标题，右侧为窗口按钮。 Logo 模式、自定义文本与左右布局由配置与主题驱动，文本全部走本地化。</summary>
 public partial class TitleBar : UserControl
 {
     private const string TitleLayerAnimationKey = "TitleBar Title Layer";
 
     private const string InnerTitleAnimationKey = "TitleBar Inner Title";
+
+    private readonly Dictionary<MainTab, MyRadioButton> _tabButtons = [];
 
     private bool _isSecondary;
 
@@ -32,6 +29,7 @@ public partial class TitleBar : UserControl
     public TitleBar()
     {
         InitializeComponent();
+        BuildMainTabs();
         AddHandler(
             PointerPressedEvent,
             Root_OnPointerPressed,
@@ -161,7 +159,7 @@ public partial class TitleBar : UserControl
 
     private void AnimateInnerTitle(string title)
     {
-        AniStop(InnerTitleAnimationKey);
+        AnimationService.CancelAnimationByName(InnerTitleAnimationKey);
         if (!CanAnimateShell)
         {
             LabTitleInner.Text = title;
@@ -169,12 +167,12 @@ public partial class TitleBar : UserControl
             return;
         }
 
-        AniStart(
-            new List<AniData>
+        AnimationService.Run(
+            new List<IAnimation>
             {
-                AaOpacity(LabTitleInner, -LabTitleInner.Opacity, 130),
-                AaCode(() => LabTitleInner.Text = title, after: true),
-                AaOpacity(LabTitleInner, 1d, 150, 30)
+                new OpacityAnimation(LabTitleInner, -LabTitleInner.Opacity, 130),
+                new ActionAnimation(() => LabTitleInner.Text = title, true),
+                new OpacityAnimation(LabTitleInner, 1d, 150, 30)
             },
             InnerTitleAnimationKey);
     }
@@ -183,7 +181,7 @@ public partial class TitleBar : UserControl
     {
         var main = PanTitleMain;
         var inner = PanInnerTitle;
-        AniStop(TitleLayerAnimationKey);
+        AnimationService.CancelAnimationByName(TitleLayerAnimationKey);
 
         if (!animate || !CanAnimateShell)
         {
@@ -205,18 +203,18 @@ public partial class TitleBar : UserControl
             if (inner is { Opacity: <= 0.1d, RenderTransform: TranslateTransform { X: 0d } })
                 inner.RenderTransform = new TranslateTransform(-16d, 0d);
             var innerX = GetTranslateX(inner);
-            AniStart(
-                new List<AniData>
+            AnimationService.Run(
+                new List<IAnimation>
                 {
-                    AaOpacity(main, -main.Opacity, 150),
-                    AaTranslateX(
+                    new OpacityAnimation(main, -main.Opacity, 150),
+                    new TranslateXAnimation(
                         main,
                         12d - mainX,
                         150,
-                        ease: new AniEaseInFluent(AniEasePower.Weak)),
-                    AaOpacity(inner, 1d - inner.Opacity, 150, 200),
-                    AaTranslateX(inner, -innerX, 350, 200, new AniEaseOutBack()),
-                    AaCode(() => main.IsVisible = false, after: true)
+                        ease: new FluentEaseIn(EasePower.Weak)),
+                    new OpacityAnimation(inner, 1d - inner.Opacity, 150, 200),
+                    new TranslateXAnimation(inner, -innerX, 350, 200, new BackEaseWithPowerOut()),
+                    new ActionAnimation(() => main.IsVisible = false, true)
                 },
                 TitleLayerAnimationKey);
             return;
@@ -225,14 +223,19 @@ public partial class TitleBar : UserControl
         main.IsVisible = true;
         main.IsHitTestVisible = true;
         var innerCurrentX = GetTranslateX(inner);
-        AniStart(
-            new List<AniData>
+        AnimationService.Run(
+            new List<IAnimation>
             {
-                AaOpacity(inner, -inner.Opacity, 150),
-                AaTranslateX(inner, -18d - innerCurrentX, 150, ease: new AniEaseInFluent()),
-                AaOpacity(main, 1d - main.Opacity, 150, 200),
-                AaTranslateX(main, -mainX, 350, 200, new AniEaseOutBack(AniEasePower.Weak)),
-                AaCode(() => inner.IsVisible = false, after: true)
+                new OpacityAnimation(inner, -inner.Opacity, 150),
+                new TranslateXAnimation(inner, -18d - innerCurrentX, 150, ease: new FluentEaseIn()),
+                new OpacityAnimation(main, 1d - main.Opacity, 150, 200),
+                new TranslateXAnimation(
+                    main,
+                    -mainX,
+                    350,
+                    200,
+                    new BackEaseWithPowerOut(EasePower.Weak)),
+                new ActionAnimation(() => inner.IsVisible = false, true)
             },
             TitleLayerAnimationKey);
     }
@@ -247,22 +250,42 @@ public partial class TitleBar : UserControl
         if (control.RenderTransform is TranslateTransform transform) transform.X = 0d;
     }
 
+    private void BuildMainTabs()
+    {
+        PanTitleSelect.Children.Clear();
+        _tabButtons.Clear();
+
+        foreach (var descriptor in PageCatalog.MainTabs.OrderBy(tab => tab.Order))
+        {
+            var button = new MyRadioButton
+            {
+                SvgIcon = descriptor.IconKey,
+                LogoScale = descriptor.LogoScale,
+                ColorType = MyRadioButton.ColorState.White,
+                Padding = new Thickness(2d, 0d),
+                Margin = new Thickness(5d, 0d),
+                CheckCommandParameter = descriptor.Id
+            };
+            button.SetLocalizedValue(MyRadioButton.TextProperty, descriptor.TitleKey);
+            button.Check += Tab_OnCheck;
+            _tabButtons[descriptor.Id] = button;
+            PanTitleSelect.Children.Add(button);
+        }
+
+        SetTabChecked(MainTab.Launch);
+    }
+
     private void SetTabChecked(MainTab tab)
     {
-        BtnTitleSelect0.Checked = tab == MainTab.Launch;
-        BtnTitleSelect1.Checked = tab == MainTab.Download;
-        BtnTitleSelect2.Checked = tab == MainTab.Setup;
-        BtnTitleSelect3.Checked = tab == MainTab.Tools;
+        foreach (var (id, button) in _tabButtons)
+            button.Checked = id == tab;
     }
 
     private void Tab_OnCheck(MyRadioButton sender, bool raiseByMouse)
     {
         if (_updating || !raiseByMouse) return;
-        TabSelected?.Invoke(
-            ReferenceEquals(sender, BtnTitleSelect1) ? MainTab.Download
-            : ReferenceEquals(sender, BtnTitleSelect2) ? MainTab.Setup
-            : ReferenceEquals(sender, BtnTitleSelect3) ? MainTab.Tools
-            : MainTab.Launch);
+        if (sender.CheckCommandParameter is MainTab tab)
+            TabSelected?.Invoke(tab);
     }
 
     private void Back_OnClick(object? sender, EventArgs e)

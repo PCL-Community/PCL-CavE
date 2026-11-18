@@ -4,15 +4,16 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using PCL.Core.App.Localization;
+using PCL.Navigation;
 using PCL.UI.Controls;
 using PCL.Views.Shell;
 
 namespace PCL.Views.Pages.Select;
 
 /// <summary>
-///     实例选择页右栏：按实例分类分组的实例卡片列表，支持搜索、收藏、删除与进入实例设置。
-///     数据来自 <see cref="InstanceList.mcInstanceListLoader" />；加载环状态由
-///     <see cref="MyPageRight.PageLoaderInit" /> 统一管理。
+/// 实例选择页右栏：按实例分类分组的实例卡片列表，支持搜索、收藏、删除与进入实例设置。 数据来自
+/// <see cref="InstanceList.mcInstanceListLoader" />；加载环状态由
+/// <see cref="MyPageRight.PageLoaderInit" /> 统一管理。
 /// </summary>
 public partial class PageSelectRight : MyPageRight, IRefreshable, IShellShortcutTarget
 {
@@ -32,8 +33,10 @@ public partial class PageSelectRight : MyPageRight, IRefreshable, IShellShortcut
         Current = this;
         PanScroll = PanBack;
         DataContext = ViewModel;
-        PanVerSearchBox.HintText = Lang.Text("Select.Instance.Search.Hint");
-        ToolTip.SetTip(PanVerSearchBox, Lang.Text("Select.Instance.Search.ToolTip"));
+        PanVerSearchBox.SetLocalizedValue(
+            MySearchBox.HintTextProperty,
+            "Select.Instance.Search.Hint");
+        PanVerSearchBox.SetLocalizedValue(ToolTip.TipProperty, "Select.Instance.Search.ToolTip");
         PanVerSearchBox.TextChanged += (_, _) => OnSearchTextChanged();
         DetachedFromVisualTree += (_, _) => StopReloadTimer();
         EnsureLoaderInitialized();
@@ -84,8 +87,8 @@ public partial class PageSelectRight : MyPageRight, IRefreshable, IShellShortcut
     }
 
     /// <summary>
-    ///     PageOnEnter 会先触发 PageEnter，再根据加载器状态决定显示内容还是加载环。
-    ///     因此必须在这里完成加载器初始化与刷新，不能等到 OnNavigatedTo。
+    /// PageOnEnter 会先触发 PageEnter，再根据加载器状态决定显示内容还是加载环。 因此必须在这里完成加载器初始化与刷新，不能等到
+    /// OnNavigatedTo。
     /// </summary>
     private void OnPageEnter()
     {
@@ -93,21 +96,10 @@ public partial class PageSelectRight : MyPageRight, IRefreshable, IShellShortcut
         RefreshOnNavigate();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         EnsureLoaderInitialized();
         RefreshOnNavigate();
-    }
-
-    protected override void RefreshLocalization()
-    {
-        PanVerSearchBox.HintText = Lang.Text("Select.Instance.Search.Hint");
-        ToolTip.SetTip(PanVerSearchBox, Lang.Text("Select.Instance.Search.ToolTip"));
-        if (InstanceList.mcInstanceListLoader.State != LoadState.Finished)
-            return;
-        var savedOffset = PanBack.Offset;
-        McInstanceListUi(InstanceList.mcInstanceListLoader);
-        Dispatcher.UIThread.Post(() => PanBack.Offset = savedOffset);
     }
 
     public override void OnNavigatedFrom()
@@ -203,10 +195,7 @@ public partial class PageSelectRight : MyPageRight, IRefreshable, IShellShortcut
                     Margin = new Thickness(0d, 0d, 0d, 15d),
                     Tag = (Key: group.NameKey, Type: cardType)
                 };
-                LocalizedText.TryBind(
-                    newCard,
-                    "Title",
-                    () => PageSelectRightViewModel.GetCardTitle(group));
+                LocalizedText.TryBind(newCard, "Title", () => group.Title);
 
                 var stack = new StackPanel
                 {
@@ -323,9 +312,9 @@ public partial class PageSelectRight : MyPageRight, IRefreshable, IShellShortcut
             LogoScale = 1.1d,
             SvgIcon = version.IsStar ? "lucide/heart-filled" : "lucide/heart"
         };
-        ToolTip.SetTip(
-            btnStar,
-            Lang.Text(version.IsStar ? "Select.Instance.Unfavorite" : "Select.Instance.Favorite"));
+        btnStar.SetLocalizedValue(
+            ToolTip.TipProperty,
+            version.IsStar ? "Select.Instance.Unfavorite" : "Select.Instance.Favorite");
         btnStar.Click += (_, _) => PageSelectRightViewModel.ToggleFavorite(version);
 
         var btnOpenFolder = new MyIconButton
@@ -333,7 +322,7 @@ public partial class PageSelectRight : MyPageRight, IRefreshable, IShellShortcut
             LogoScale = 1.1d,
             SvgIcon = "lucide/folder-open"
         };
-        ToolTip.SetTip(btnOpenFolder, Lang.Text("Select.Instance.OpenFolder"));
+        btnOpenFolder.SetLocalizedValue(ToolTip.TipProperty, "Select.Instance.OpenFolder");
         btnOpenFolder.Click += (_, _) => PageSelectRightViewModel.OpenVersionFolder(version);
 
         var btnDelete = new MyIconButton
@@ -341,7 +330,7 @@ public partial class PageSelectRight : MyPageRight, IRefreshable, IShellShortcut
             LogoScale = 1.1d,
             SvgIcon = "lucide/trash-2"
         };
-        ToolTip.SetTip(btnDelete, Lang.Text("Common.Action.Delete"));
+        btnDelete.SetLocalizedValue(ToolTip.TipProperty, "Common.Action.Delete");
         btnDelete.Click += (_, _) => _ = ViewModel.DeleteVersionAsync(
             version,
             btnDelete.LastClickKeyModifiers.HasFlag(KeyModifiers.Shift));
@@ -353,12 +342,11 @@ public partial class PageSelectRight : MyPageRight, IRefreshable, IShellShortcut
                 ? "lucide/folder-open"
                 : "lucide/settings"
         };
-        ToolTip.SetTip(
-            btnSettings,
-            Lang.Text(
-                version.state == McInstanceState.Error
-                    ? "Common.Action.OpenFolder"
-                    : "Select.Instance.Settings"));
+        btnSettings.SetLocalizedValue(
+            ToolTip.TipProperty,
+            version.state == McInstanceState.Error
+                ? "Common.Action.OpenFolder"
+                : "Select.Instance.Settings");
         if (version.state == McInstanceState.Error)
             btnSettings.Click += (_, _) => PageSelectRightViewModel.OpenVersionFolder(version);
         else

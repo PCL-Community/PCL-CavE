@@ -13,8 +13,8 @@ using PCL.Views.Pages.Instance;
 namespace PCL.Views.Shell;
 
 /// <summary>
-///     主窗口文件拖放：authlib 验证服务器链接、自定义主页 xaml、实例资源、存档、整合包和崩溃报告。
-///     页面可通过 <see cref="FileDropped" /> 抢先接收拖入的文件；未被页面处理的文件由这里按类型路由。
+/// 主窗口文件拖放：authlib 验证服务器链接、自定义主页 AXAML/XAML、实例资源、存档、整合包和崩溃报告。 页面可通过
+/// <see cref="FileDropped" /> 抢先接收拖入的文件；未被页面处理的文件由这里按类型路由。
 /// </summary>
 public sealed class FileDragHandler
 {
@@ -61,7 +61,7 @@ public sealed class FileDragHandler
         }
     }
 
-    private static void OnDrop(object? sender, DragEventArgs e)
+    private static async void OnDrop(object? sender, DragEventArgs e)
     {
         try
         {
@@ -74,7 +74,7 @@ public sealed class FileDragHandler
                 if (text.StartsWith(AuthlibPrefix, StringComparison.Ordinal))
                 {
                     e.DragEffects = DragDropEffects.Copy;
-                    HandleAuthlibText(text);
+                    await HandleAuthlibText(text);
                     return;
                 }
 
@@ -82,7 +82,7 @@ public sealed class FileDragHandler
                 {
                     e.DragEffects = DragDropEffects.Copy;
                     var path = new Uri(text).LocalPath;
-                    HandleFiles([path]);
+                    await HandleFiles([path]);
                     return;
                 }
             }
@@ -91,7 +91,7 @@ public sealed class FileDragHandler
             if (files is { Length: > 0 })
             {
                 e.DragEffects = DragDropEffects.Link;
-                HandleFiles([.. files.Select(GetLocalPath).OfType<string>()]);
+                await HandleFiles([.. files.Select(GetLocalPath).OfType<string>()]);
                 return;
             }
 
@@ -115,7 +115,7 @@ public sealed class FileDragHandler
         }
     }
 
-    private static void HandleAuthlibText(string text)
+    private static async Task HandleAuthlibText(string text)
     {
         var server = Uri.UnescapeDataString(text[AuthlibPrefix.Length..]);
         LogWrapper.Info("UI", $"拖入 authlib 验证服务器：{server}");
@@ -126,15 +126,13 @@ public sealed class FileDragHandler
             return;
         }
 
-        var confirmed = DialogService.Instance.Show(
-                    new TextDialogRequest
-                    {
-                        Title = Lang.Text("Main.FileDrag.CreateAuthlibProfileTitle"),
-                        Content = Lang.Text("Main.FileDrag.CreateAuthlibProfile", server),
-                        Buttons = DialogButtons.OkCancel,
-                        ForceWait = true
-                    })
-                .Result?.Button
+        var confirmed = (await DialogService.Instance.ShowAsync(
+                new TextDialogRequest
+                {
+                    Title = Lang.Text("Main.FileDrag.CreateAuthlibProfileTitle"),
+                    Content = Lang.Text("Main.FileDrag.CreateAuthlibProfile", server),
+                    Buttons = DialogButtons.OkCancel
+                })).Button
             == 1;
         if (!confirmed) return;
 
@@ -147,7 +145,7 @@ public sealed class FileDragHandler
         AuthlibServerDropped(server);
     }
 
-    private static void HandleFiles(IReadOnlyList<string> rawPaths)
+    private static async Task HandleFiles(IReadOnlyList<string> rawPaths)
     {
         var paths = rawPaths.Where(path => !string.IsNullOrWhiteSpace(path)).ToList();
         if (paths.Count == 0)
@@ -175,9 +173,9 @@ public sealed class FileDragHandler
         }
 
         var extension = Path.GetExtension(paths[0]).ToLowerInvariant();
-        if (extension == ".xaml")
+        if (extension is ".xaml" or ".axaml")
         {
-            LoadCustomHomepage(paths[0]);
+            await LoadCustomHomepage(paths[0]);
             return;
         }
 
@@ -195,31 +193,31 @@ public sealed class FileDragHandler
                 LogWrapper.Error(ex, "UI", $"页面处理拖放文件失败：{paths[0]}");
             }
 
-        if (TryInstallMods(paths))
+        if (await TryInstallMods(paths))
             return;
 
-        if (TryInstallSchematics(paths))
+        if (await TryInstallSchematics(paths))
             return;
 
-        if (extension == ".zip" && PageRouter.Current is { Page: PageType.InstanceSetup } current)
-            switch (current.SubType)
+        if (extension == ".zip" && PageRouter.Current.Page == PageIds.InstanceSetup)
+        {
+            var current = PageRouter.Current;
+            if (current.SubPage == SubPageIds.VersionWorld)
             {
-                case PageSubType.VersionWorld:
-                {
-                    ImportSave(paths[0]);
-                    return;
-                }
-
-                case PageSubType.VersionResourcePack or PageSubType.VersionShader:
-                {
-                    var type = current.SubType == PageSubType.VersionResourcePack
-                        ? Comp.CompType.ResourcePack
-                        : Comp.CompType.Shader;
-                    if (TryInstallInstanceFiles(paths, type))
-                        return;
-                    break;
-                }
+                ImportSave(paths[0]);
+                return;
             }
+
+            if (current.SubPage == SubPageIds.VersionResourcePack
+                || current.SubPage == SubPageIds.VersionShader)
+            {
+                var type = current.SubPage == SubPageIds.VersionResourcePack
+                    ? Comp.CompType.ResourcePack
+                    : Comp.CompType.Shader;
+                if (await TryInstallInstanceFiles(paths, type))
+                    return;
+            }
+        }
 
         switch (extension)
         {
@@ -247,7 +245,7 @@ public sealed class FileDragHandler
         }
     }
 
-    private static bool TryInstallMods(IReadOnlyList<string> paths)
+    private static async Task<bool> TryInstallMods(IReadOnlyList<string> paths)
     {
         var modExtensions = new[]
         {
@@ -274,21 +272,19 @@ public sealed class FileDragHandler
             return true;
         }
 
-        var isModPage = PageRouter.Current is
-            { Page: PageType.InstanceSetup, SubType: PageSubType.VersionMod };
+        var isModPage = PageRouter.Current.Page == PageIds.InstanceSetup
+            && PageRouter.Current.SubPage == SubPageIds.VersionMod;
         if (!isModPage)
         {
-            var confirmed = DialogService.Instance.Show(
-                        new TextDialogRequest
-                        {
-                            Title = Lang.Text("Instance.Resource.Install.ModConfirm.Title"),
-                            Content = Lang.Text(
-                                "Instance.Resource.Install.ModConfirm.Message",
-                                instance.Name),
-                            Buttons = DialogButtons.OkCancel,
-                            ForceWait = true
-                        })
-                    .Result?.Button
+            var confirmed = (await DialogService.Instance.ShowAsync(
+                    new TextDialogRequest
+                    {
+                        Title = Lang.Text("Instance.Resource.Install.ModConfirm.Title"),
+                        Content = Lang.Text(
+                            "Instance.Resource.Install.ModConfirm.Message",
+                            instance.Name),
+                        Buttons = DialogButtons.OkCancel
+                    })).Button
                 == 1;
             if (!confirmed) return true;
         }
@@ -299,7 +295,7 @@ public sealed class FileDragHandler
                 ? Path.Combine("labymod-neo", "fabric", instance.Info.VanillaName)
                 : string.Empty,
             LocalComp.GetPathNameByCompType(Comp.CompType.Mod));
-        return InstallInstanceFiles(paths, folder);
+        return await InstallInstanceFiles(paths, folder);
     }
 
     private static McInstance? ResolveTargetInstance()
@@ -307,7 +303,7 @@ public sealed class FileDragHandler
         return PageInstanceLeft.ResolveInstance() ?? InstanceList.McMcInstanceSelected;
     }
 
-    private static bool TryInstallSchematics(IReadOnlyList<string> paths)
+    private static async Task<bool> TryInstallSchematics(IReadOnlyList<string> paths)
     {
         if (!paths.All(path => LocalComp.LocalCompFile.IsCompFile(
                 path,
@@ -324,18 +320,18 @@ public sealed class FileDragHandler
         var folder = Path.Combine(
             instance.PathIndie,
             LocalComp.GetPathNameByCompType(Comp.CompType.Schematic));
-        if (PageRouter.Current is
-                { Page: PageType.InstanceSetup, SubType: PageSubType.VersionSchematic }
+        if (PageRouter.Current.Page == PageIds.InstanceSetup
+            && PageRouter.Current.SubPage == SubPageIds.VersionSchematic
             && PageRouter.CurrentPage is ICompLocalPage
             {
                 CurrentFolderPath: { Length: > 0 } currentFolder
             })
             folder = currentFolder;
 
-        return InstallInstanceFiles(paths, folder);
+        return await InstallInstanceFiles(paths, folder);
     }
 
-    private static bool TryInstallInstanceFiles(
+    private static async Task<bool> TryInstallInstanceFiles(
         IReadOnlyList<string> paths,
         Comp.CompType type)
     {
@@ -349,10 +345,10 @@ public sealed class FileDragHandler
         var folder = Path.Combine(
             instance.PathIndie,
             LocalComp.GetPathNameByCompType(type));
-        return InstallInstanceFiles(paths, folder);
+        return await InstallInstanceFiles(paths, folder);
     }
 
-    private static bool InstallInstanceFiles(
+    private static async Task<bool> InstallInstanceFiles(
         IReadOnlyList<string> paths,
         string folder)
     {
@@ -365,18 +361,16 @@ public sealed class FileDragHandler
                 var target = Path.Combine(folder, Path.GetFileName(path));
                 if (File.Exists(target))
                 {
-                    var overwrite = DialogService.Instance.Show(
-                                new TextDialogRequest
-                                {
-                                    Title = Lang.Text(
-                                        "Instance.Resource.Install.OverwriteConfirm.Title"),
-                                    Content = Lang.Text(
-                                        "Instance.Resource.Install.OverwriteConfirm.Message",
-                                        Path.GetFileName(target)),
-                                    Buttons = DialogButtons.OkCancel,
-                                    ForceWait = true
-                                })
-                            .Result?.Button
+                    var overwrite = (await DialogService.Instance.ShowAsync(
+                            new TextDialogRequest
+                            {
+                                Title = Lang.Text(
+                                    "Instance.Resource.Install.OverwriteConfirm.Title"),
+                                Content = Lang.Text(
+                                    "Instance.Resource.Install.OverwriteConfirm.Message",
+                                    Path.GetFileName(target)),
+                                Buttons = DialogButtons.OkCancel
+                            })).Button
                         == 1;
                     if (!overwrite) continue;
                 }
@@ -524,20 +518,18 @@ public sealed class FileDragHandler
                 Path.GetExtension(path).Equals(first, StringComparison.InvariantCultureIgnoreCase));
     }
 
-    private static void LoadCustomHomepage(string path)
+    private static async Task LoadCustomHomepage(string path)
     {
         var target = Path.Combine(Paths.Data, "Custom.xaml");
         if (File.Exists(target))
         {
-            var overwrite = DialogService.Instance.Show(
-                        new TextDialogRequest
-                        {
-                            Title = Lang.Text("Main.FileDrag.OverwriteTitle"),
-                            Content = Lang.Text("Main.FileDrag.HomepageExists"),
-                            Buttons = DialogButtons.OkCancel,
-                            ForceWait = true
-                        })
-                    .Result?.Button
+            var overwrite = (await DialogService.Instance.ShowAsync(
+                    new TextDialogRequest
+                    {
+                        Title = Lang.Text("Main.FileDrag.OverwriteTitle"),
+                        Content = Lang.Text("Main.FileDrag.HomepageExists"),
+                        Buttons = DialogButtons.OkCancel
+                    })).Button
                 == 1;
             if (!overwrite) return;
         }

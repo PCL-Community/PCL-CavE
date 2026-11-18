@@ -1,9 +1,7 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Threading;
+using Avalonia.Data;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
-using PCL.Core.Logging;
+using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Setup;
@@ -11,7 +9,6 @@ namespace PCL.Views.Pages.Setup;
 /// <summary>日志设置页：列出日志文件、导出当前/全部日志、打开日志目录与清理非活动日志。</summary>
 public partial class PageSetupLog : MyPageRight
 {
-    private readonly PageSetupLogViewModel _viewModel = new();
     private bool _loaded;
     private bool _refreshed;
 
@@ -19,7 +16,7 @@ public partial class PageSetupLog : MyPageRight
     {
         InitializeComponent();
         PanScroll = PanBack;
-        DataContext = _viewModel;
+        DataContext = ViewModel;
 
         BtnOpenDir.Click += (_, _) => PageSetupLogViewModel.OpenLogDirectory();
         BtnExport.Click += (_, _) => _ = ExportCurrentAsync();
@@ -35,9 +32,9 @@ public partial class PageSetupLog : MyPageRight
         Unloaded += (_, _) => _refreshed = false;
     }
 
-    public PageSetupLogViewModel ViewModel => _viewModel;
+    public PageSetupLogViewModel ViewModel { get; } = new();
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack.ScrollToHome();
         Refresh();
@@ -45,13 +42,6 @@ public partial class PageSetupLog : MyPageRight
 
     public override void OnNavigatedFrom()
     {
-    }
-
-    protected override void RefreshLocalization()
-    {
-        var offset = PanBack.Offset.Y;
-        LoadList();
-        Dispatcher.UIThread.Post(() => PanBack.Offset = new Vector(PanBack.Offset.X, offset));
     }
 
     private void Refresh()
@@ -70,16 +60,21 @@ public partial class PageSetupLog : MyPageRight
     {
         try
         {
-            await _viewModel.LoadListAsync();
+            await ViewModel.LoadListAsync();
             PanList.Children.Clear();
-            foreach (var entry in _viewModel.Entries)
+            foreach (var entry in ViewModel.Entries)
             {
                 var item = new MyListItem
                 {
                     Type = MyListItem.CheckType.Clickable,
-                    Title = entry.Title,
                     Info = entry.FilePath
                 };
+                item.Bind(
+                    MyListItem.TitleProperty,
+                    new Binding(nameof(SetupLogEntry.Title))
+                    {
+                        Source = entry
+                    });
                 var file = entry.FilePath;
                 item.Click += (_, _) => Basics.OpenPath(file);
                 PanList.Children.Add(item);
@@ -101,7 +96,7 @@ public partial class PageSetupLog : MyPageRight
         ctl.IsEnabled = false;
         try
         {
-            if (await _viewModel.CleanAsync())
+            if (await ViewModel.CleanAsync())
                 LoadList();
         }
         catch (Exception ex)
@@ -122,7 +117,7 @@ public partial class PageSetupLog : MyPageRight
     {
         try
         {
-            await _viewModel.ExportAllAsync();
+            await ViewModel.ExportAllAsync();
         }
         catch (Exception ex)
         {
@@ -138,7 +133,7 @@ public partial class PageSetupLog : MyPageRight
     {
         try
         {
-            await _viewModel.ExportCurrentAsync();
+            await ViewModel.ExportCurrentAsync();
         }
         catch (Exception ex)
         {

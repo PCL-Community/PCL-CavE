@@ -20,7 +20,7 @@ public partial class ProcessInterop
     private static partial uint _GetEuid();
 
     /// <summary>
-    /// 检查当前程序是否以管理员权限运行。
+    ///     检查当前程序是否以管理员权限运行。
     /// </summary>
     /// <returns>如果当前用户具有管理员权限，则返回 true；否则返回 false。</returns>
     public static bool IsAdmin()
@@ -34,7 +34,7 @@ public partial class ProcessInterop
     }
 
     /// <summary>
-    /// 获取指定进程 ID 的命令行参数。
+    ///     获取指定进程 ID 的命令行参数。
     /// </summary>
     /// <param name="processId">进程 ID</param>
     /// <returns>命令行参数文本</returns>
@@ -67,13 +67,16 @@ public partial class ProcessInterop
     }
 
     /// <summary>
-    /// 从本地可执行文件启动新的进程。
+    ///     从本地可执行文件启动新的进程。
     /// </summary>
     /// <param name="path">可执行文件路径</param>
     /// <param name="arguments">程序参数</param>
     /// <param name="runAsAdmin">指定是否以管理员身份启动该进程</param>
     /// <returns>新的进程实例</returns>
-    public static Process? Start(string path, string? arguments = null, bool runAsAdmin = false)
+    public static Process? Start(
+        string path,
+        string? arguments = null,
+        bool runAsAdmin = false)
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -193,7 +196,7 @@ public partial class ProcessInterop
     }
 
     /// <summary>
-    /// 获取指定进程的可执行文件路径
+    ///     获取指定进程的可执行文件路径
     /// </summary>
     /// <param name="process">进程实例</param>
     /// <returns>可执行文件路径，若无法获取则为 <c>null</c></returns>
@@ -211,7 +214,7 @@ public partial class ProcessInterop
     }
 
     /// <summary>
-    /// 从本地可执行文件以管理员身份启动新的进程。<see cref="Start"/> 的套壳。
+    ///     从本地可执行文件以管理员身份启动新的进程。<see cref="Start" /> 的套壳。
     /// </summary>
     /// <param name="path">可执行文件路径</param>
     /// <param name="arguments">程序参数</param>
@@ -222,12 +225,12 @@ public partial class ProcessInterop
     }
 
     /// <summary>
-    /// 结束指定进程。
+    ///     结束指定进程。
     /// </summary>
     /// <param name="process">要结束的进程实例</param>
     /// <param name="timeout">等待进程退出超时，以毫秒为单位，-1 表示无限制</param>
     /// <param name="force">指定是否强制结束：Windows 上通过带 <c>/F</c> 参数的 <c>TASKKILL.EXE</c>，其余平台直接强制结束</param>
-    /// <returns>进程返回值，若等待超时将返回 <see cref="int.MinValue"/></returns>
+    /// <returns>进程返回值，若等待超时将返回 <see cref="int.MinValue" /></returns>
     public static int Kill(Process process, int timeout = 3000, bool force = false)
     {
         if (!force) process.Kill();
@@ -244,7 +247,7 @@ public partial class ProcessInterop
     }
 
     /// <summary>
-    /// 将特定程序设置为使用高性能显卡启动。
+    ///     将特定程序设置为使用高性能显卡启动。
     /// </summary>
     /// <param name="executable">可执行文件路径。</param>
     /// <param name="wantHighPerformance">是否使用高性能显卡，默认为 true。</param>
@@ -263,18 +266,13 @@ public partial class ProcessInterop
 
         // 参数验证
         if (string.IsNullOrWhiteSpace(executable))
-        {
             throw new ArgumentException("可执行文件路径不能为空或仅包含空白字符", nameof(executable));
-        }
 
         // 验证文件路径格式
         try
         {
             var fullPath = Path.GetFullPath(executable);
-            if (!File.Exists(fullPath))
-            {
-                LogWrapper.Warn("System", $"指定的可执行文件不存在: {executable}");
-            }
+            if (!File.Exists(fullPath)) LogWrapper.Warn("System", $"指定的可执行文件不存在: {executable}");
         }
         catch (Exception ex) when (ex is ArgumentException
                                        or NotSupportedException
@@ -313,13 +311,13 @@ public partial class ProcessInterop
         }
         catch (UnauthorizedAccessException ex)
         {
-            var errorMsg = "没有足够的权限访问注册表。请以管理员身份运行程序或检查用户权限设置。";
+            const string errorMsg = "没有足够的权限访问注册表。请以管理员身份运行程序或检查用户权限设置。";
             LogWrapper.Error(ex, "System", errorMsg);
             throw new UnauthorizedAccessException(errorMsg, ex);
         }
         catch (SecurityException ex)
         {
-            var errorMsg = "安全策略不允许访问注册表。请联系系统管理员检查安全设置。";
+            const string errorMsg = "安全策略不允许访问注册表。请联系系统管理员检查安全设置。";
             LogWrapper.Error(ex, "System", errorMsg);
             throw new SecurityException(errorMsg, ex);
         }
@@ -332,7 +330,7 @@ public partial class ProcessInterop
     }
 
     /// <summary>
-    /// 获取当前程序的GPU偏好设置
+    ///     获取当前程序的GPU偏好设置
     /// </summary>
     [SupportedOSPlatform("windows")]
     private static bool _GetCurrentGpuPreference(
@@ -360,7 +358,7 @@ public partial class ProcessInterop
     }
 
     /// <summary>
-    /// 设置GPU偏好值到注册表
+    ///     设置GPU偏好值到注册表
     /// </summary>
     [SupportedOSPlatform("windows")]
     private static bool _SetGpuPreferenceValue(
@@ -382,10 +380,7 @@ public partial class ProcessInterop
                 LogWrapper.Info("System", "创建 GPU 偏好注册表键");
                 writeKey = Registry.CurrentUser.CreateSubKey(regKey);
 
-                if (writeKey is null)
-                {
-                    throw new InvalidOperationException($"无法创建注册表键: {regKey}");
-                }
+                if (writeKey is null) throw new InvalidOperationException($"无法创建注册表键: {regKey}");
             }
 
             var valueToSet = wantHighPerformance ? highPerfValue : defaultValue;
@@ -417,27 +412,4 @@ public partial class ProcessInterop
             writeKey?.Dispose();
         }
     }
-}
-
-public enum ProcessExitCode
-{
-    /// <summary>
-    /// Indicates that the process completed successfully.
-    /// </summary>
-    TaskDone = 0,
-
-    /// <summary>
-    /// Indicates a general failure of the process.
-    /// </summary>
-    Failed = 1,
-
-    /// <summary>
-    /// Indicates the process was canceled.
-    /// </summary>
-    Canceled = 2,
-
-    /// <summary>
-    /// Indicates the process failed due to insufficient permissions.
-    /// </summary>
-    AccessDenied = 5
 }

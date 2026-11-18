@@ -2,19 +2,17 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
-using PCL.Core.App.Localization;
 using PCL.Navigation;
 using PCL.Views.Pages;
-using static PCL.Animations;
 
 namespace PCL.UI.Controls;
 
 /// <summary>
-///     页面右栏容器：管理内容页与加载环的显示状态。
-///     页面状态机（Empty/LoaderWait/LoaderEnter/.../PageExit）决定何时播放入场、退场与加载环等待；
-///     所有转场挂在“PageRight PageChange”动画键下，快速切换时旧回调随动画组一起丢弃。
+/// 页面右栏容器：管理内容页与加载环的显示状态。
+/// 页面状态机（Empty/LoaderWait/LoaderEnter/.../PageExit）决定何时播放入场、退场与加载环等待； 所有转场挂在“PageRight
+/// PageChange”动画键下，快速切换时旧回调随动画组一起丢弃。
 /// </summary>
-public class MyPageRight : Decorator, IPageView
+public class MyPageRight : Decorator, IPageView, IPageRightContainer
 {
     // 当前状态
     public enum PageStates
@@ -71,7 +69,13 @@ public class MyPageRight : Decorator, IPageView
         }
     } = PageStates.Empty;
 
-    public virtual void OnNavigatedTo(object? parameter)
+    /// <summary>
+    /// 加载期间是否显示 <c>panAlways</c>。默认与 WPF 一致，在加载环出现时一并显示；
+    /// 资源搜索/详情页可关闭，避免未加载完成就露出搜索筛选框或详情简介。
+    /// </summary>
+    public bool ShowAlwaysWhileLoading { get; set; } = true;
+
+    public virtual void OnNavigatedTo(PageParameter? parameter)
     {
     }
 
@@ -90,9 +94,7 @@ public class MyPageRight : Decorator, IPageView
     private bool _pageLoaderAutoRun;
 
     // 初始化
-    /// <summary>
-    ///     表明页面存在需要在后台执行的加载器。
-    /// </summary>
+    /// <summary>表明页面存在需要在后台执行的加载器。</summary>
     /// <param name="loaderUi">MyLoading 控件。</param>
     /// <param name="panLoader">MyLoading 控件对应的卡片。</param>
     /// <param name="panContent">加载结束后出现的内容容器。</param>
@@ -151,32 +153,6 @@ public class MyPageRight : Decorator, IPageView
         }; // 点击重试事件
     }
 
-    private void RefreshLocalizationIfStale()
-    {
-        if (_localizationRevision == LocalizationService.UiRevision)
-            return;
-        _localizationRevision = LocalizationService.UiRevision;
-        try
-        {
-            RefreshLocalization();
-        }
-        catch (Exception ex)
-        {
-            LauncherCommon.Log(ex, "刷新页面本地化文本失败");
-        }
-    }
-
-    protected virtual void RefreshLocalization()
-    {
-    }
-
-    public void ApplyLocalizationChanged()
-    {
-        RefreshLocalizationIfStale();
-    }
-
-    private int _localizationRevision = LocalizationService.UiRevision;
-
     // 重试
     public void PageLoaderRestart(object? input = null, bool isForceRestart = true) // 由外部调用的重试
     {
@@ -209,14 +185,13 @@ public class MyPageRight : Decorator, IPageView
 
     // 外部触发的事件
     /// <summary>
-    ///     需要切换到当前页面，并且原本的 Loaded 事件已执行完成。
-    ///     需要根据加载器状态，从 Empty 切换到 ContentEnter、LoaderWait、LoaderEnter。
+    /// 需要切换到当前页面，并且原本的 Loaded 事件已执行完成。 需要根据加载器状态，从 Empty 切换到
+    /// ContentEnter、LoaderWait、LoaderEnter。
     /// </summary>
     public void PageOnEnter()
     {
         if (LauncherCommon.ModeDebug)
             LauncherCommon.Log("[UI] 已触发 PageOnEnter");
-        RefreshLocalizationIfStale();
         PageEnter?.Invoke();
         switch (PageState)
         {
@@ -239,7 +214,7 @@ public class MyPageRight : Decorator, IPageView
                 else // PageLoader.State = LoadState.Failed
                 {
                     PageState = PageStates.LoaderEnter;
-                    TriggerEnterAnimation(_panAlways, _panLoader);
+                    TriggerLoaderEnterAnimation();
                 }
 
                 break;
@@ -294,10 +269,7 @@ public class MyPageRight : Decorator, IPageView
 
     public delegate void PageEnterEventHandler();
 
-    /// <summary>
-    ///     需要切换到其他页面。
-    ///     需要立即切换至 PageExit 或 Empty。
-    /// </summary>
+    /// <summary>需要切换到其他页面。 需要立即切换至 PageExit 或 Empty。</summary>
     public void PageOnExit()
     {
         if (LauncherCommon.ModeDebug)
@@ -353,10 +325,7 @@ public class MyPageRight : Decorator, IPageView
 
     public delegate void PageExitEventHandler();
 
-    /// <summary>
-    ///     即将切换到其他页面，需要强制完成页面状态清理。
-    ///     需要立即切换至 Empty。
-    /// </summary>
+    /// <summary>即将切换到其他页面，需要强制完成页面状态清理。 需要立即切换至 Empty。</summary>
     public void PageOnForceExit()
     {
         if (PageState == PageStates.Empty)
@@ -365,7 +334,7 @@ public class MyPageRight : Decorator, IPageView
             LauncherCommon.Log("[UI] 已触发 PageOnForceExit");
         PageState = PageStates.Empty;
         // 由于动画会被强制中止，所以需要手动进行隐藏
-        AniStop(PageChangeAnimationKey);
+        AnimationService.CancelAnimationByName(PageChangeAnimationKey);
         if (_pageLoader is null && Child is not null)
         {
             Child.IsVisible = false;
@@ -378,10 +347,7 @@ public class MyPageRight : Decorator, IPageView
         }
     }
 
-    /// <summary>
-    ///     PanContent 中的子页面改变，需要让当前内容退出，再显示新的内容。
-    ///     需要在 PageEnter 事件确认要显示的子页面有哪些。
-    /// </summary>
+    /// <summary>PanContent 中的子页面改变，需要让当前内容退出，再显示新的内容。 需要在 PageEnter 事件确认要显示的子页面有哪些。</summary>
     public void PageOnContentExit()
     {
         if (LauncherCommon.ModeDebug)
@@ -445,8 +411,8 @@ public class MyPageRight : Decorator, IPageView
             return;
         }
 
-        AniStart(
-            AaCode(
+        AnimationService.Run(
+            new ActionAnimation(
                 () =>
                 {
                     // 页面可能在等待期间退出；同名动画被顶掉后这里不会再执行
@@ -469,8 +435,8 @@ public class MyPageRight : Decorator, IPageView
             return;
         }
 
-        AniStart(
-            AaCode(
+        AnimationService.Run(
+            new ActionAnimation(
                 () =>
                 {
                     if (PageState == PageStates.LoaderStayForce)
@@ -481,8 +447,8 @@ public class MyPageRight : Decorator, IPageView
     }
 
     /// <summary>
-    ///     逐个进入动画已执行完成。
-    ///     需要根据目前状态，从 ContentEnter 切换到 ContentStay，或从 LoaderEnter 切换到 LoaderStayForce。
+    /// 逐个进入动画已执行完成。 需要根据目前状态，从 ContentEnter 切换到 ContentStay，或从 LoaderEnter 切换到
+    /// LoaderStayForce。
     /// </summary>
     private void PageOnEnterAnimationFinished()
     {
@@ -520,8 +486,8 @@ public class MyPageRight : Decorator, IPageView
     }
 
     /// <summary>
-    ///     逐个退出动画已执行完成。
-    ///     需要根据目前状态，从 AllExit 切换到 Empty，或从 LoaderExit 切换到 ContentEnter，或从 ContentExit 重新触发 PageOnEnter。
+    /// 逐个退出动画已执行完成。 需要根据目前状态，从 AllExit 切换到 Empty，或从 LoaderExit 切换到 ContentEnter，或从
+    /// ContentExit 重新触发 PageOnEnter。
     /// </summary>
     private void PageOnExitAnimationFinished()
     {
@@ -544,7 +510,10 @@ public class MyPageRight : Decorator, IPageView
             case PageStates.LoaderExit:
             {
                 PageState = PageStates.ContentEnter;
-                TriggerEnterAnimation(_panContent);
+                if (_panAlways is not null && !_panAlways.IsVisible)
+                    TriggerEnterAnimation(_panAlways, _panContent);
+                else
+                    TriggerEnterAnimation(_panContent);
                 break;
             }
 
@@ -563,10 +532,7 @@ public class MyPageRight : Decorator, IPageView
         }
     }
 
-    /// <summary>
-    ///     加载环进入等待已结束。
-    ///     需要从 LoaderWait 切换到 LoaderEnter。
-    /// </summary>
+    /// <summary>加载环进入等待已结束。 需要从 LoaderWait 切换到 LoaderEnter。</summary>
     private void PageOnLoaderWaitFinished()
     {
         if (LauncherCommon.ModeDebug)
@@ -576,10 +542,7 @@ public class MyPageRight : Decorator, IPageView
             case PageStates.LoaderWait:
             {
                 PageState = PageStates.LoaderEnter;
-                if (_panAlways is not null && !_panAlways.IsVisible)
-                    TriggerEnterAnimation(_panAlways, _panLoader);
-                else
-                    TriggerEnterAnimation(_panLoader);
+                TriggerLoaderEnterAnimation();
 
                 break;
             }
@@ -601,10 +564,16 @@ public class MyPageRight : Decorator, IPageView
         }
     }
 
-    /// <summary>
-    ///     加载环展示等待已结束。
-    ///     需要从 LoaderStayForce 切换到 LoaderStay 或 LoaderExit。
-    /// </summary>
+    /// <summary>播放加载环入场；按页面需要决定是否同时显示 always 区域。</summary>
+    private void TriggerLoaderEnterAnimation()
+    {
+        if (ShowAlwaysWhileLoading && _panAlways is not null && !_panAlways.IsVisible)
+            TriggerEnterAnimation(_panAlways, _panLoader);
+        else
+            TriggerEnterAnimation(_panLoader);
+    }
+
+    /// <summary>加载环展示等待已结束。 需要从 LoaderStayForce 切换到 LoaderStay 或 LoaderExit。</summary>
     private void PageOnLoaderStayFinished()
     {
         if (LauncherCommon.ModeDebug)
@@ -643,9 +612,7 @@ public class MyPageRight : Decorator, IPageView
         }
     }
 
-    /// <summary>
-    ///     全局加载状态已改变。
-    /// </summary>
+    /// <summary>全局加载状态已改变。</summary>
     private void PageLoaderState(
         Loading.LoaderBase sender,
         LoadState newState,
@@ -695,9 +662,7 @@ public class MyPageRight : Decorator, IPageView
         }
     }
 
-    /// <summary>
-    ///     处理加载开始或重新加载时的页面状态转换。
-    /// </summary>
+    /// <summary>处理加载开始或重新加载时的页面状态转换。</summary>
     private void HandleLoadStarted()
     {
         switch (PageState)
@@ -729,9 +694,7 @@ public class MyPageRight : Decorator, IPageView
         }
     }
 
-    /// <summary>
-    ///     处理加载结束、中止或进入等待状态时的页面状态转换。
-    /// </summary>
+    /// <summary>处理加载结束、中止或进入等待状态时的页面状态转换。</summary>
     private void HandleLoadStopped()
     {
         switch (PageState)
@@ -773,6 +736,8 @@ public class MyPageRight : Decorator, IPageView
 
     #region 动画
 
+    private const int MaxStaggerDelay = 250;
+
     private string PageChangeAnimationKey => "PageRight PageChange " + pageUuid;
 
     public void TriggerEnterAnimation(params Control?[] elements)
@@ -783,7 +748,7 @@ public class MyPageRight : Decorator, IPageView
 
         if (!ContainerAnimation.CanAnimatePage(this))
         {
-            AniStop(PageChangeAnimationKey);
+            AnimationService.CancelAnimationByName(PageChangeAnimationKey);
             foreach (var element in realElements)
             {
                 foreach (var control in GetAllAnimControls(element, true))
@@ -812,7 +777,7 @@ public class MyPageRight : Decorator, IPageView
         }
 
         ResetScrollTransform(GetFirstScrollViewer(realElements));
-        var aniList = new List<AniData>();
+        var aniList = new List<IAnimation>();
         var delay = 0;
         foreach (var element in realElements)
         {
@@ -834,20 +799,27 @@ public class MyPageRight : Decorator, IPageView
                     control.Opacity = 0d;
                     control.RenderTransform = new TranslateTransform(0d, -16d);
                     aniList.Add(
-                        AaOpacity(
+                        new OpacityAnimation(
                             control,
                             1d,
                             100,
                             delay,
-                            new AniEaseOutFluent(AniEasePower.Weak)));
-                    aniList.Add(AaTranslateY(control, 5d, 250, delay, new AniEaseOutFluent()));
-                    aniList.Add(AaTranslateY(control, 11d, 350, delay, new AniEaseOutBack()));
-                    delay += 25;
+                            new FluentEaseOut(EasePower.Weak)));
+                    aniList.Add(
+                        new TranslateYAnimation(control, 5d, 250, delay, new FluentEaseOut()));
+                    aniList.Add(
+                        new TranslateYAnimation(
+                            control,
+                            11d,
+                            350,
+                            delay,
+                            new BackEaseWithPowerOut()));
+                    delay = Math.Min(delay + 25, MaxStaggerDelay);
                 }
         }
 
-        aniList.Add(AaCode(PageOnEnterAnimationFinished, after: true));
-        AniStart(aniList, PageChangeAnimationKey, true);
+        aniList.Add(new ActionAnimation(PageOnEnterAnimationFinished, true));
+        AnimationService.Run(aniList, PageChangeAnimationKey, true);
     }
 
     public void TriggerExitAnimation(params Control?[] elements)
@@ -856,7 +828,7 @@ public class MyPageRight : Decorator, IPageView
 
         if (!ContainerAnimation.CanAnimatePage(this))
         {
-            AniStop(PageChangeAnimationKey);
+            AnimationService.CancelAnimationByName(PageChangeAnimationKey);
             foreach (var control in realElements.SelectMany(element => GetAllAnimControls(element)))
                 if (control is MyExtraTextButton extraTextButton)
                 {
@@ -877,7 +849,7 @@ public class MyPageRight : Decorator, IPageView
             return;
         }
 
-        var aniList = new List<AniData>();
+        var aniList = new List<IAnimation>();
         var delay = 0;
         foreach (var control in realElements.SelectMany(element => GetAllAnimControls(element)))
             if (control is MyExtraTextButton extraTextButton)
@@ -888,21 +860,21 @@ public class MyPageRight : Decorator, IPageView
             {
                 if (control is not MyListItem)
                     control.IsHitTestVisible = false;
-                aniList.Add(AaOpacity(control, -control.Opacity, 70, delay));
-                aniList.Add(AaTranslateY(control, -6d, 70, delay));
+                aniList.Add(new OpacityAnimation(control, -control.Opacity, 70, delay));
+                aniList.Add(new TranslateYAnimation(control, -6d, 70, delay));
                 delay += 15;
             }
 
         aniList.Add(
-            AaCode(
+            new ActionAnimation(
                 () =>
                 {
                     foreach (var element in realElements)
                         element.IsVisible = false;
                     PageOnExitAnimationFinished();
                 },
-                after: true));
-        AniStart(aniList, PageChangeAnimationKey);
+                true));
+        AnimationService.Run(aniList, PageChangeAnimationKey);
     }
 
     /// <summary>找到页面中第一个 <see cref="MyScrollViewer" />，用于转场前复位滚动容器位移。</summary>
@@ -955,14 +927,10 @@ public class MyPageRight : Decorator, IPageView
             transform.X = 0d;
     }
 
-    /// <summary>
-    ///     禁用页面切换动画的控件列表。
-    /// </summary>
+    /// <summary>禁用页面切换动画的控件列表。</summary>
     public List<Control> disabledPageAnimControls = [];
 
-    /// <summary>
-    ///     遍历获取所有需要生成动画的控件。
-    /// </summary>
+    /// <summary>遍历获取所有需要生成动画的控件。</summary>
     internal IEnumerable<Control> GetAllAnimControls(
         Control element,
         bool ignoreInvisibility = false)

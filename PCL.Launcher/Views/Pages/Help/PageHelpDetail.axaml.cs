@@ -4,13 +4,12 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Hints;
+using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages;
 
-/// <summary>
-///     帮助详情页：展示帮助 JSON 的标题与正文；正文由 <see cref="HelpXamlRenderer" /> 转换，无法转换时退回纯文本。
-/// </summary>
+/// <summary>帮助详情页：展示帮助 JSON 的标题与正文；正文由 <see cref="HelpXamlRenderer" /> 转换，无法转换时退回纯文本。</summary>
 public partial class PageHelpDetail : MyPageRight, IRefreshable
 {
     public PageHelpDetail()
@@ -31,7 +30,7 @@ public partial class PageHelpDetail : MyPageRight, IRefreshable
 
     public event Action<string>? TitleChanged;
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         switch (parameter)
         {
@@ -48,11 +47,6 @@ public partial class PageHelpDetail : MyPageRight, IRefreshable
 
     public override void OnNavigatedFrom()
     {
-    }
-
-    protected override void RefreshLocalization()
-    {
-        Refresh();
     }
 
     private async Task RefreshAsync()
@@ -100,7 +94,7 @@ public partial class PageHelpDetail : MyPageRight, IRefreshable
         var rendered = HelpXamlRenderer.Render(
             PageHelpDetailViewModel.ReplaceArguments(content.Xaml),
             ResolveResource);
-        if (rendered.Success && rendered.Controls.Count > 0)
+        if (rendered is { Success: true, Controls.Count: > 0 })
         {
             PanCustom.Children.Clear();
             PanCustom.Children.Add(rendered.Controls[0]);

@@ -267,17 +267,30 @@ public sealed class ProfileUiBridge : IProfileUi
     public string IsProfileValid()
     {
         var profile = ProfileService.Current;
-        if (profile is null) return Lang.Text("Minecraft.Launch.Precheck.NoProfile");
-        if (profile.ProfileType != ProfileType.Offline) return string.Empty;
-        if (string.IsNullOrWhiteSpace(profile.UserName))
-            return Lang.Text("Launch.Account.Profile.Validation.EmptyUsername");
-        if (profile.UserName.Contains('"'))
-            return Lang.Text("Launch.Account.Profile.Validation.QuoteInUsername");
-        if (InstanceList.McMcInstanceSelected is { } instance
-            && instance.Info.Drop >= 203
-            && profile.UserName.Trim().Length > 16)
-            return Lang.Text("Launch.Account.Profile.Validation.UsernameTooLong");
-        return string.Empty;
+        if (profile is null)
+            return Lang.Text("Minecraft.Launch.Precheck.NoProfile");
+
+        var userName = profile.UserName;
+        return profile.ProfileType switch
+        {
+            not ProfileType.Offline => string.Empty,
+
+            ProfileType.Offline when
+                string.IsNullOrWhiteSpace(userName) =>
+                Lang.Text("Launch.Account.Profile.Validation.EmptyUsername"),
+
+            ProfileType.Offline when
+                userName?.Contains('"') == true =>
+                Lang.Text("Launch.Account.Profile.Validation.QuoteInUsername"),
+
+            ProfileType.Offline when
+                InstanceList.McMcInstanceSelected is { Info.Drop: >= 203 }
+                && userName is not null
+                && userName.Trim().Length > 16 =>
+                Lang.Text("Launch.Account.Profile.Validation.UsernameTooLong"),
+
+            _ => string.Empty
+        };
     }
 
     public Task<AuthorizeResult?> ShowDeviceCodeLoginAsync(
@@ -291,7 +304,8 @@ public sealed class ProfileUiBridge : IProfileUi
         {
             Title = Lang.Text("Launch.Account.LoginDialog.MinecraftLogin"),
             Buttons = default,
-            Data = JsonSerializer.SerializeToNode(context.Data, JsonCompat.SerializerOptions)!
+            Data = JsonSerializer
+                .SerializeToNode(context.Data, JsonCompat.SerializerOptions)!
                 .AsObject(),
             DeviceCodePoll = (_, pollToken) => context.PollAsync(pollToken),
             LoginResultHandler = (oauth, _) =>
@@ -304,7 +318,7 @@ public sealed class ProfileUiBridge : IProfileUi
                 if (result is Exception exception) completion.TrySetException(exception);
             }
         };
-        DialogService.Instance.Show(request);
+        DialogService.Instance.ShowNotification(request);
         return completion.Task;
     }
 
@@ -321,49 +335,48 @@ public sealed class ProfileUiBridge : IProfileUi
             or "xsts_2148916238"))
             return false;
 
-        LauncherCommon.RunInUiWait(() =>
+        switch (normalizedError)
         {
-            switch (normalizedError)
-            {
-                case "xsts_2148916227":
-                    _ = DialogService.Instance.ShowAsync(
-                        new TextDialogRequest
-                        {
-                            Title = Lang.Text("Minecraft.Launch.Login.Failed"),
-                            Content = Lang.Text("Minecraft.Launch.Login.Microsoft.Banned"),
-                            Buttons = DialogButtons.From(
-                                DialogButton.Create(Lang.Text("Minecraft.Launch.Login.IKnow"))),
-                            IsWarn = true
-                        });
-                    break;
-                case "xsts_2148916233":
-                    if (UiInteraction.Message(
-                            Lang.Text("Minecraft.Launch.Login.Microsoft.XboxNotRegistered"),
-                            Lang.Text("Minecraft.Launch.Login.Hint"),
-                            Lang.Text("Minecraft.Launch.Login.Register"),
-                            Lang.Text("Common.Action.Cancel"))
-                        == 1)
-                        UiInteraction.OpenWebsite("https://signup.live.com/signup");
-                    break;
-                case "xsts_2148916235":
-                    _ = DialogService.Instance.ShowAsync(
-                        new TextDialogRequest
-                        {
-                            Title = Lang.Text("Minecraft.Launch.Login.Failed"),
-                            Content = Lang.Text("Minecraft.Launch.Login.Microsoft.RegionBlocked"),
-                            Buttons = DialogButtons.From(
-                                DialogButton.Create(Lang.Text("Minecraft.Launch.Login.IKnow")))
-                        });
-                    break;
-                case "xsts_2148916238":
-                    if (UiInteraction.Message(
-                            Lang.Text("Minecraft.Launch.Login.Microsoft.Underage.Message"),
-                            Lang.Text("Minecraft.Launch.Login.Hint"),
-                            Lang.Text("Minecraft.Launch.Login.Microsoft.Underage.AgeOver13"),
-                            Lang.Text("Minecraft.Launch.Login.Microsoft.Underage.AgeUnder13"),
-                            Lang.Text("Common.Option.IDontKnow"))
-                        == 1)
+            case "xsts_2148916227":
+                _ = DialogService.Instance.ShowAsync(
+                    new TextDialogRequest
                     {
+                        Title = Lang.Text("Minecraft.Launch.Login.Failed"),
+                        Content = Lang.Text("Minecraft.Launch.Login.Microsoft.Banned"),
+                        Buttons = DialogButtons.From(
+                            DialogButton.Create(Lang.Text("Minecraft.Launch.Login.IKnow"))),
+                        IsWarn = true
+                    });
+                break;
+            case "xsts_2148916233":
+                if (UiInteraction.MessageBlockingOnWorkerThread(
+                        Lang.Text("Minecraft.Launch.Login.Microsoft.XboxNotRegistered"),
+                        Lang.Text("Minecraft.Launch.Login.Hint"),
+                        Lang.Text("Minecraft.Launch.Login.Register"),
+                        Lang.Text("Common.Action.Cancel"))
+                    == 1)
+                    UiInteraction.OpenWebsite("https://signup.live.com/signup");
+                break;
+            case "xsts_2148916235":
+                _ = DialogService.Instance.ShowAsync(
+                    new TextDialogRequest
+                    {
+                        Title = Lang.Text("Minecraft.Launch.Login.Failed"),
+                        Content = Lang.Text("Minecraft.Launch.Login.Microsoft.RegionBlocked"),
+                        Buttons = DialogButtons.From(
+                            DialogButton.Create(Lang.Text("Minecraft.Launch.Login.IKnow")))
+                    });
+                break;
+            case "xsts_2148916238":
+                var result = UiInteraction.MessageBlockingOnWorkerThread(
+                    Lang.Text("Minecraft.Launch.Login.Microsoft.Underage.Message"),
+                    Lang.Text("Minecraft.Launch.Login.Hint"),
+                    Lang.Text("Minecraft.Launch.Login.Microsoft.Underage.AgeOver13"),
+                    Lang.Text("Minecraft.Launch.Login.Microsoft.Underage.AgeUnder13"),
+                    Lang.Text("Common.Option.IDontKnow"));
+                switch (result)
+                {
+                    case 1:
                         UiInteraction.OpenWebsite("https://account.live.com/editprof.aspx");
                         _ = DialogService.Instance.ShowAsync(
                             new TextDialogRequest
@@ -373,9 +386,8 @@ public sealed class ProfileUiBridge : IProfileUi
                                     "Minecraft.Launch.Login.Microsoft.ChangeBirthDate.Message"),
                                 Buttons = DialogButtons.Ok
                             });
-                    }
-                    else
-                    {
+                        break;
+                    default:
                         UiInteraction.OpenWebsite(
                             "https://support.microsoft.com/zh-cn/account-billing/"
                             + "如何更改-microsoft-帐户上的出生日期-837badbc-999e-54d2-2617-d19206b9540a");
@@ -387,11 +399,12 @@ public sealed class ProfileUiBridge : IProfileUi
                                     "Minecraft.Launch.Login.Microsoft.ChangeBirthDate.SupportMessage"),
                                 Buttons = DialogButtons.Ok
                             });
-                    }
+                        break;
+                }
 
-                    break;
-            }
-        });
+                break;
+        }
+
         return true;
     }
 
@@ -403,18 +416,15 @@ public sealed class ProfileUiBridge : IProfileUi
                 StringComparison.OrdinalIgnoreCase))
             return false;
 
-        LauncherCommon.RunInUiWait(() =>
-        {
-            if (UiInteraction.Message(
-                    Lang.Text("Minecraft.Launch.Login.Microsoft.NotPurchased"),
-                    Lang.Text("Minecraft.Launch.Login.Failed"),
-                    Lang.Text("Minecraft.Launch.Login.Microsoft.PurchaseMinecraft"),
-                    Lang.Text("Common.Action.Cancel"))
-                == 1)
-                UiInteraction.OpenWebsite(
-                    "https://www.xbox.com/zh-cn/games/store/"
-                    + "minecraft-java-bedrock-edition-for-pc/9nxp44l49shj");
-        });
+        var result = UiInteraction.MessageBlockingOnWorkerThread(
+            Lang.Text("Minecraft.Launch.Login.Microsoft.NotPurchased"),
+            Lang.Text("Minecraft.Launch.Login.Failed"),
+            Lang.Text("Minecraft.Launch.Login.Microsoft.PurchaseMinecraft"),
+            Lang.Text("Common.Action.Cancel"));
+        if (result == 1)
+            UiInteraction.OpenWebsite(
+                "https://www.xbox.com/zh-cn/games/store/"
+                + "minecraft-java-bedrock-edition-for-pc/9nxp44l49shj");
         return true;
     }
 
@@ -427,17 +437,14 @@ public sealed class ProfileUiBridge : IProfileUi
                 StringComparison.OrdinalIgnoreCase))
             return false;
 
-        LauncherCommon.RunInUiWait(() =>
-        {
-            if (UiInteraction.Message(
-                    Lang.Text("Minecraft.Launch.Login.Microsoft.CreateProfile.Message"),
-                    Lang.Text("Minecraft.Launch.Login.Failed"),
-                    Lang.Text("Minecraft.Launch.Login.Microsoft.CreateProfile.Button"),
-                    Lang.Text("Common.Action.Cancel"))
-                == 1)
-                UiInteraction.OpenWebsite(
-                    "https://www.minecraft.net/zh-hans/msaprofile/mygames/editprofile");
-        });
+        var result = UiInteraction.MessageBlockingOnWorkerThread(
+            Lang.Text("Minecraft.Launch.Login.Microsoft.CreateProfile.Message"),
+            Lang.Text("Minecraft.Launch.Login.Failed"),
+            Lang.Text("Minecraft.Launch.Login.Microsoft.CreateProfile.Button"),
+            Lang.Text("Common.Action.Cancel"));
+        if (result == 1)
+            UiInteraction.OpenWebsite(
+                "https://www.minecraft.net/zh-hans/msaprofile/mygames/editprofile");
         return true;
     }
 }
@@ -448,9 +455,13 @@ public sealed class LogFilterBridge : ILogFilter
     public string FilterUserName(string raw, char filterChar)
     {
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        if (string.IsNullOrEmpty(userProfile) || !raw.Contains(userProfile)) return raw;
+        if (string.IsNullOrEmpty(userProfile) || !raw.Contains(userProfile))
+            return raw;
+
         var userName = Path.GetFileName(userProfile);
-        if (string.IsNullOrEmpty(userName)) return raw;
+        if (string.IsNullOrEmpty(userName))
+            return raw;
+
         return raw.Replace(
             userProfile,
             userProfile.Replace(userName, new string(filterChar, userName.Length)));
@@ -523,7 +534,11 @@ public sealed class RestrictedFeaturesBridge : IRestrictedFeatures
 
     private static RegionAssessment _Assess()
     {
+#if DEBUG || DEBUGCI
+        return new RegionAssessment(RegionClassification.Other, "debug-build");
+#else
         return RegionPolicy.Evaluate(RegionPolicy.ReadWindowsSignals());
+#endif
     }
 }
 
@@ -713,17 +728,17 @@ public sealed class CompNavigationBridge : ICompNavigationService
 {
     public void ShowCompDetail(Comp.CompProject project)
     {
-        PageRouter.Navigate(PageType.CompDetail, PageSubType.Default, project);
+        PageRouter.Navigate(PageIds.CompDetail, null, project);
     }
 
     public void ShowTaskManager()
     {
-        PageRouter.Navigate(PageType.TaskManager);
+        PageRouter.Navigate(PageIds.TaskManager);
     }
 
     public void ShowInstanceSelect()
     {
-        PageRouter.Navigate(PageType.InstanceSelect);
+        PageRouter.Navigate(PageIds.InstanceSelect);
     }
 }
 
@@ -754,15 +769,15 @@ public sealed class EventUiBridge : IEventUi
 
     public void SwitchPage(string pageType, string? subType)
     {
-        if (!Enum.TryParse<PageType>(pageType, true, out var page))
+        if (!PageCatalog.TryParsePage(pageType, out var page))
         {
             LogWrapper.Warn("UI", $"自定义事件切换页面失败：无法识别页面类型 {pageType}");
             return;
         }
 
-        var sub = PageSubType.Default;
+        SubPageId? sub = null;
         if (!string.IsNullOrEmpty(subType)
-            && !Enum.TryParse(subType, true, out sub))
+            && !PageCatalog.TryParseSubPage(page, subType, out sub))
         {
             LogWrapper.Warn("UI", $"自定义事件切换页面失败：无法识别子页面类型 {subType}");
             return;
@@ -771,14 +786,21 @@ public sealed class EventUiBridge : IEventUi
         PageRouter.Navigate(page, sub);
     }
 
-    public void StartModpackInstall()
+    public async void StartModpackInstall()
     {
-        Modpack.ModpackInstall();
+        try
+        {
+            await Modpack.ModpackInstall();
+        }
+        catch (Exception ex)
+        {
+            LogWrapper.Error(ex, "UI", "启动整合包安装失败");
+        }
     }
 
     public void StartCustomDownload(string url, string savePath, string? fileName)
     {
-        PageToolsTest.StartCustomDownload(url, fileName, savePath);
+        _ = PageToolsTest.StartCustomDownloadAsync(url, fileName, savePath);
     }
 
     public void OpenHelp(string location)
@@ -787,9 +809,9 @@ public sealed class EventUiBridge : IEventUi
         {
             var title = PageHelpDetail.ReadTitle(location);
             PageRouter.Navigate(
-                new PageStackData(
-                    PageType.HelpDetail,
-                    PageSubType.Default,
+                new PageRoute(
+                    PageIds.HelpDetail,
+                    null,
                     location,
                     string.IsNullOrEmpty(title) ? null : title));
         }
@@ -808,6 +830,13 @@ public sealed class EventUiBridge : IEventUi
 public sealed class MediaServiceBridge : IMediaService
 {
     private readonly MediaPlaybackService _media = new();
+
+    public MediaServiceBridge()
+    {
+        ExtraButtonsPanel.MusicStateProvider = GetMusicButtonState;
+        ExtraButtonsPanel.MusicToggleAction = ToggleMusic;
+        ExtraButtonsPanel.MusicNextAction = PlayNextMusic;
+    }
 
     public bool IsAvailable => _media.IsAvailable;
 
@@ -903,7 +932,7 @@ public sealed class DownloadInteractionBridge : IDownloadUserInteraction
                     ? Lang.Text("Minecraft.Update.UpdateTime") + Lang.Date(time)
                     : Lang.Text("Minecraft.Update.UpdatedAt")
                     + Lang.TimeSpan(time - DateTime.Now));
-            var result = UiInteraction.Message(
+            var result = UiInteraction.MessageBlockingOnWorkerThread(
                 message,
                 Lang.Text("Minecraft.Update.Title"),
                 Lang.Text("Common.Action.Confirm"),
@@ -913,10 +942,14 @@ public sealed class DownloadInteractionBridge : IDownloadUserInteraction
                     : "",
                 button3Action: () => OpenUpdateLog(version));
             if (result == 2)
+            {
+                var parameter = version as JsonObject
+                    ?? (PageParameter)versionName;
                 PageRouter.Navigate(
-                    PageType.Download,
-                    PageSubType.DownloadInstall,
-                    version as JsonObject ?? (object)versionName);
+                    PageIds.Download,
+                    SubPageIds.DownloadInstall,
+                    parameter);
+            }
         }
         catch (Exception ex)
         {
@@ -933,35 +966,5 @@ public sealed class DownloadInteractionBridge : IDownloadUserInteraction
         var wikiName = McFormatter.GetWikiUrlSuffix(version["id"]?.ToString() ?? "");
         var wikiUrl = $"{McFormatter.GetWikiBaseUrl()}/{wikiName.TrimStart('/')}";
         UiInteraction.OpenWebsite(wikiUrl);
-    }
-}
-
-/// <summary>把全部业务层 UI 平台桥注册到界面实现。</summary>
-public static class UiBridgeRegistration
-{
-    public static void Register()
-    {
-        LoadingUi.Current = new LoadingUiBridge();
-        LauncherUi.Interaction = new UserInteractionBridge();
-        DownloadUserInteraction.Current = new DownloadInteractionBridge();
-        UpdateUi.Current = new UpdateUiBridge();
-        AnnouncementActions.Current = new AnnouncementActionsBridge();
-        WatcherUi.Current = new WatcherUiBridge();
-        var mediaBridge = new MediaServiceBridge();
-        MediaService.Current = mediaBridge;
-        ExtraButtonsPanel.MusicStateProvider = mediaBridge.GetMusicButtonState;
-        ExtraButtonsPanel.MusicToggleAction = mediaBridge.ToggleMusic;
-        ExtraButtonsPanel.MusicNextAction = mediaBridge.PlayNextMusic;
-        CrashAnalysisService.Current = new CrashAnalysisBridge();
-        CompNavigation.Current = new CompNavigationBridge();
-        CompUi.Current = new CompUiBridge();
-        CompLocalUi.Current = new CompLocalUiBridge();
-        MemorySettings.Current = new MemorySettingsBridge();
-        LaunchUi.Current = new LaunchUiBridge();
-        LoginProfile.Current = new ProfileUiBridge();
-        LogFilter.Current = new LogFilterBridge();
-        RestrictedFeatures.Current = new RestrictedFeaturesBridge();
-        ModpackUi.Current = new ModpackUiBridge();
-        EventUi.Current = new EventUiBridge();
     }
 }

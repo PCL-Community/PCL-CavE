@@ -33,7 +33,7 @@ public partial class PageSelectLeftViewModel : ViewModelBase
         {
             selected = snapshot[0];
             States.Game.SelectedFolder = selected.Location
-                .Replace(LauncherPaths.ExecutableDirectory, "$");
+                .Replace(LauncherPaths.UserDataRoot, "$");
             GameFolders.ApplySelectedFolder(selected.Location);
         }
 
@@ -49,15 +49,9 @@ public partial class PageSelectLeftViewModel : ViewModelBase
 
         _lastFolders = snapshot;
         Folders = _lastFolders;
-        CanCreateFolder = !Directory.Exists(
-            Path.Combine(LauncherPaths.ExecutableDirectory, ".minecraft"));
+        CanCreateFolder = !Directory.Exists(LauncherPaths.DefaultMinecraftDirectory);
         SelectedFolder = selected;
         return true;
-    }
-
-    public void InvalidateFolders()
-    {
-        _lastFolders = null;
     }
 
     public static bool CanMoveUp(GameFolders.McFolder folder)
@@ -75,7 +69,7 @@ public partial class PageSelectLeftViewModel : ViewModelBase
     {
         return GameFolders.mcFolderList.Count == 1
             && folder.Location
-            == Path.Combine(LauncherPaths.ExecutableDirectory, ".minecraft")
+            == LauncherPaths.DefaultMinecraftDirectory
             + Path.DirectorySeparatorChar
                 ? "Select.Folder.Clear"
                 : "Common.Action.Delete";
@@ -86,7 +80,7 @@ public partial class PageSelectLeftViewModel : ViewModelBase
         return folder.Type is GameFolders.McFolder.Types.Original
                 or GameFolders.McFolder.Types.RenamedOriginal
             && folder.Location
-            == Path.Combine(LauncherPaths.ExecutableDirectory, ".minecraft")
+            == LauncherPaths.DefaultMinecraftDirectory
             + Path.DirectorySeparatorChar
             && GameFolders.mcFolderList.Count == 1;
     }
@@ -104,7 +98,7 @@ public partial class PageSelectLeftViewModel : ViewModelBase
         }
 
         States.Game.SelectedFolder = folder.Location
-            .Replace(LauncherPaths.ExecutableDirectory, "$");
+            .Replace(LauncherPaths.UserDataRoot, "$");
         GameFolders.ApplySelectedFolder(folder.Location);
         LauncherCommon.Log(
             $"[Minecraft] 切换文件夹：{folder.Location}",
@@ -180,7 +174,7 @@ public partial class PageSelectLeftViewModel : ViewModelBase
             return;
         }
 
-        var minecraftFolder = Path.Combine(LauncherPaths.ExecutableDirectory, ".minecraft")
+        var minecraftFolder = LauncherPaths.DefaultMinecraftDirectory
             + Path.DirectorySeparatorChar;
         if (!Directory.Exists(minecraftFolder))
         {
@@ -207,7 +201,7 @@ public partial class PageSelectLeftViewModel : ViewModelBase
 
         try
         {
-            newFolder = SystemDialogs.SelectFolder();
+            newFolder = await SystemDialogs.SelectFolderAsync();
             if (string.IsNullOrEmpty(newFolder))
                 return;
             if (newFolder.Contains('!') || newFolder.Contains(';'))
@@ -259,9 +253,9 @@ public partial class PageSelectLeftViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public static void InstallModpack()
+    public static async Task InstallModpack()
     {
-        Modpack.ModpackInstall();
+        await Modpack.ModpackInstall();
     }
 
     [RelayCommand]
@@ -593,7 +587,7 @@ public partial class PageSelectLeftViewModel : ViewModelBase
                     folders.Add($"{displayName}>{folderPath}");
                 States.Game.Folders = string.Join("|", folders);
                 States.Game.SelectedFolder = folderPath
-                    .Replace(LauncherPaths.ExecutableDirectory, "$");
+                    .Replace(LauncherPaths.UserDataRoot, "$");
                 GameFolders.ApplySelectedFolder(folderPath);
                 GameFolders.McFolderListLoader.Start(null, true);
                 if (isReplace)
@@ -655,14 +649,11 @@ public partial class PageSelectLeftViewModel : ViewModelBase
         var separator = Path.DirectorySeparatorChar;
         var location = folder.Location;
         var minecraftFolder =
-            Path.Combine(LauncherPaths.ExecutableDirectory, ".minecraft") + separator;
-        var mojangFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                ".minecraft")
-            + separator;
+            LauncherPaths.DefaultMinecraftDirectory + separator;
+        var mojangFolder = LauncherPaths.OfficialMinecraftDirectory;
         string name;
         if (location == minecraftFolder
-            || location == LauncherPaths.ExecutableDirectory + separator)
+            || location == LauncherPaths.UserDataRoot)
             name = GameFolders.McFolder.BuiltinNamePrefix + "Select.Folder.CurrentFolder";
         else if (location == mojangFolder)
             name = GameFolders.McFolder.BuiltinNamePrefix + "Select.Folder.OfficialLauncherFolder";

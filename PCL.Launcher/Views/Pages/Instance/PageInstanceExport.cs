@@ -1,14 +1,16 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
+using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Instance;
 
 /// <summary>
-///     实例导出页：包名/版本、按实例内容动态显隐的导出内容选项、高级选项与底部导出按钮。
-///     配置项树、动态子项与导出流程由 <see cref="PageInstanceExportViewModel" /> 维护。
+/// 实例导出页：包名/版本、按实例内容动态显隐的导出内容选项、高级选项与底部导出按钮。 配置项树、动态子项与导出流程由
+/// <see cref="PageInstanceExportViewModel" /> 维护。
 /// </summary>
 public partial class PageInstanceExport : MyPageRight, IRefreshable
 {
@@ -21,6 +23,12 @@ public partial class PageInstanceExport : MyPageRight, IRefreshable
         InitializeComponent();
         DataContext = ViewModel;
         PanScroll = PanBack;
+        CardOptions.Bind(
+            MyCard.TitleProperty,
+            new Binding(nameof(PageInstanceExportViewModel.OptionsTitle))
+            {
+                Source = ViewModel
+            });
 
         BtnExport.Click += (_, _) => _ = StartExportAsync();
         BtnOverrideCancel.Click += (_, _) => ResetConfigOverrides();
@@ -38,6 +46,16 @@ public partial class PageInstanceExport : MyPageRight, IRefreshable
         {
             if (!_syncing)
                 ViewModel.PackVersion = TextExportVersion.Text ?? string.Empty;
+        };
+        TextExportName.GotFocus += (_, _) =>
+        {
+            if (!string.IsNullOrEmpty(TextExportName.Text))
+                return;
+            var hint = ViewModel.PackNameHint;
+            if (string.IsNullOrEmpty(hint))
+                return;
+            TextExportName.Text = hint;
+            TextExportName.CaretIndex = hint.Length;
         };
         CheckAdvancedInclude.Change += (_, _) =>
         {
@@ -71,20 +89,13 @@ public partial class PageInstanceExport : MyPageRight, IRefreshable
         RefreshAll();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         var changed = ViewModel.AttachInstance(InstancePageHelper.ResolveInstance(parameter));
         if (changed)
             ViewModel.RefreshAll();
         else
             ViewModel.RefreshSubOptions();
-        BuildOptionTree();
-        SyncUiFromViewModel();
-    }
-
-    protected override void RefreshLocalization()
-    {
-        ViewModel.RefreshAll();
         BuildOptionTree();
         SyncUiFromViewModel();
     }
@@ -106,6 +117,8 @@ public partial class PageInstanceExport : MyPageRight, IRefreshable
                 TextExportName.Text = ViewModel.PackName;
             if (TextExportVersion.Text != ViewModel.PackVersion)
                 TextExportVersion.Text = ViewModel.PackVersion;
+            TextExportName.HintText = ViewModel.PackNameHint;
+            TextExportVersion.HintText = ViewModel.PackVersionHint;
             HintOptiFine.IsVisible = ViewModel.HasOptiFine;
             HintBundle.IsVisible = ViewModel.ShowBundleHint;
             CheckAdvancedInclude.Checked = ViewModel.BundleFiles;
@@ -114,7 +127,6 @@ public partial class PageInstanceExport : MyPageRight, IRefreshable
             CheckAdvancedModrinth.IsEnabled = ViewModel.ModrinthEnabled;
             BtnOverrideCancel.IsVisible = ViewModel.ResetOverridesVisible;
             PanOptions.IsVisible = ViewModel.OptionsVisible;
-            CardOptions.Title = ViewModel.OptionsTitle;
 
             foreach (var (option, box) in _optionBoxes)
             {
@@ -144,7 +156,6 @@ public partial class PageInstanceExport : MyPageRight, IRefreshable
             CheckAdvancedModrinth.IsEnabled = ViewModel.ModrinthEnabled;
             BtnOverrideCancel.IsVisible = ViewModel.ResetOverridesVisible;
             PanOptions.IsVisible = ViewModel.OptionsVisible;
-            CardOptions.Title = ViewModel.OptionsTitle;
 
             foreach (var (option, box) in _optionBoxes)
             {
@@ -168,18 +179,18 @@ public partial class PageInstanceExport : MyPageRight, IRefreshable
         SyncOptionsAndAdvanced();
     }
 
-    private void ImportConfig()
+    private async void ImportConfig()
     {
-        if (ViewModel.ImportConfig())
+        if (await ViewModel.ImportConfig())
         {
             BuildOptionTree();
             SyncUiFromViewModel();
         }
     }
 
-    private void ExportConfig()
+    private async void ExportConfig()
     {
-        ViewModel.ExportConfig();
+        await ViewModel.ExportConfig();
     }
 
     private static string? GetSingleTxtFile(DragEventArgs e)
@@ -242,7 +253,6 @@ public partial class PageInstanceExport : MyPageRight, IRefreshable
     {
         var box = new MyCheckBox
         {
-            Text = option.Title,
             Height = 26d,
             Tag = option,
             Checked = option.IsChecked,
@@ -252,7 +262,13 @@ public partial class PageInstanceExport : MyPageRight, IRefreshable
                 ? new Thickness(30d, 0d, 0d, 0d)
                 : new Thickness(0d)
         };
-        if (!string.IsNullOrEmpty(option.Description))
+        if (string.IsNullOrEmpty(option.TitleKey))
+            box.Text = option.Title;
+        else
+            box.SetLocalizedValue(MyCheckBox.TextProperty, option.TitleKey);
+        if (!string.IsNullOrEmpty(option.DescriptionKey))
+            box.SetLocalizedValue(ToolTip.TipProperty, option.DescriptionKey);
+        else if (!string.IsNullOrEmpty(option.Description))
             ToolTip.SetTip(box, option.Description);
         box.Change += (_, _) =>
         {

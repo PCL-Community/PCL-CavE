@@ -9,13 +9,12 @@ using Avalonia.Media;
 using PCL.Core.Logging;
 using PCL.UI.Controls.Common;
 using Path = Avalonia.Controls.Shapes.Path;
-using static PCL.Animations;
 
 namespace PCL.UI.Controls;
 
 /// <summary>
 ///     卡片容器：阴影层 + 圆角背景层 + 标题/折叠箭头层，用户内容直接加入 <see cref="Panel.Children" />。
-///     悬停阴影与标题变色、主题配色过渡、内容高度变化与折叠箭头旋转由 <c>PCL.Animations</c> 驱动；
+///     悬停阴影与标题变色、主题配色过渡、内容高度变化与折叠箭头旋转由 新动画引擎 驱动；
 ///     高度动画带 <see cref="UseAnimation" /> 与 <c>_isHeightAnimating</c> 双重守卫，避免尺寸回调自激。
 /// </summary>
 public class MyCard : Grid
@@ -66,22 +65,18 @@ public class MyCard : Grid
 
     public MyCard()
     {
-        MainChrome = new MyDropShadow
+        MainChrome = new CardShadow
         {
-            Margin = new Thickness(-3d, -3d, -3d, -4d),
-            ShadowRadius = 3d,
             CornerRadius = new CornerRadius(5d),
-            CenterTransparent = true,
+            ShadowBlur = 3d,
             Opacity = DropShadowIdleOpacity,
             IsHitTestVisible = false
         };
-        ContainerTheme.BindDynamic(MainChrome, MyDropShadow.ColorProperty, "ColorObject1");
+        ContainerTheme.BindDynamic(MainChrome, CardShadow.ColorProperty, "ColorObject1");
         Children.Insert(0, MainChrome);
         _mainBorder = new BlurBorder
         {
             CornerRadius = new CornerRadius(5d),
-            // BorderChild 是页面内容的宿主；必须让内容参与命中测试，
-            // 否则所有通过 BorderChild 挂载的按钮/输入框都会变成不可点击。
             IsHitTestVisible = true
         };
         Children.Insert(1, _mainBorder);
@@ -96,7 +91,7 @@ public class MyCard : Grid
         PointerReleased += _OnPointerReleased;
     }
 
-    public MyDropShadow MainChrome { get; }
+    public CardShadow MainChrome { get; }
 
     public Control? BorderChild
     {
@@ -164,7 +159,7 @@ public class MyCard : Grid
             return;
         _isLoad = true;
 
-        using var controlScope = SuspendControl();
+        using var controlScope = AnimationService.SuspendControl();
 
         if (_mainTextBlock is null)
         {
@@ -213,7 +208,7 @@ public class MyCard : Grid
             SwapControl.IsVisible = false;
             Height = SwapedHeight;
             // 取消由高度变化被迫触发的高度动画
-            AniStop(HeightAnimationKey);
+            AnimationService.CancelAnimationByName(HeightAnimationKey);
             _isHeightAnimating = false;
             ApplyLayoutClip();
         }
@@ -221,8 +216,7 @@ public class MyCard : Grid
 
     public void StackInstall()
     {
-        var stack = SwapControl as StackPanel;
-        if (stack is null)
+        if (SwapControl is not StackPanel stack)
             return;
 
         StackInstall(ref stack, InstallMethod);
@@ -258,7 +252,7 @@ public class MyCard : Grid
     public void TriggerForceResize()
     {
         Height = IsSwapped ? SwapedHeight : double.NaN;
-        AniStop(HeightAnimationKey);
+        AnimationService.CancelAnimationByName(HeightAnimationKey);
         _isHeightAnimating = false;
         ApplyLayoutClip();
     }
@@ -295,18 +289,18 @@ public class MyCard : Grid
         if (_isHeightAnimating || !ContainerAnimation.CanAnimate(this))
             return;
 
-        var animList = new List<AniData>();
+        var animList = new List<IAnimation>();
         var absDelta = Math.Abs(delta);
 
         if (absDelta <= 800d)
         {
             // 短距离，直接使用 150 ms 的缓动动画
             animList.Add(
-                AaHeight(
+                new HeightAnimation(
                     this,
                     delta,
                     150,
-                    ease: new AniEaseOutFluent(AniEasePower.ExtraStrong)));
+                    ease: new FluentEaseOut(EasePower.ExtraStrong)));
         }
         else
         {
@@ -339,22 +333,22 @@ public class MyCard : Grid
 
             // 匀速段
             animList.Add(
-                AaHeight(
+                new HeightAnimation(
                     this,
                     (absDelta - easeLength) * Math.Sign(delta),
                     (int)Math.Round((absDelta - easeLength) / initSpeed * 1000d)));
             // 减速段
             animList.Add(
-                AaHeight(
+                new HeightAnimation(
                     this,
                     easeLength * Math.Sign(delta),
                     easeTime,
-                    ease: new AniEaseOutFluentWithInitial(initSpeed, easeTime / 1000d, easeLength),
+                    ease: new FluentEaseOutWithInitial(initSpeed, easeTime / 1000d, easeLength),
                     after: true));
         }
 
         animList.Add(
-            AaCode(
+            new ActionAnimation(
                 () =>
                 {
                     _isHeightAnimating = false;
@@ -363,12 +357,12 @@ public class MyCard : Grid
                     if (IsSwapped && SwapControl is not null)
                         SwapControl.IsVisible = false;
                 },
-                after: true));
+                true));
         _isHeightAnimating = true;
         _actualUsedHeight = endHeight ?? (IsSwapped ? SwapedHeight : Height);
         Height = previousHeight;
         ApplyLayoutClip();
-        AniStart(animList, HeightAnimationKey);
+        AnimationService.Run(animList, HeightAnimationKey);
     }
 
     private void ApplyLayoutClip()
@@ -506,7 +500,7 @@ public class MyCard : Grid
 
         // 展开和收起都先露出内容，再按原来的分段高度动画从当前高度走到目标高度。
         // 动画期间 Height 保持显式值，ApplyLayoutClip 会把内容裁在卡片里。
-        AniStop(HeightAnimationKey);
+        AnimationService.CancelAnimationByName(HeightAnimationKey);
         _isHeightAnimating = false;
         ApplyLayoutClip();
         SwapControl.IsVisible = true;
@@ -519,7 +513,9 @@ public class MyCard : Grid
         {
             var start = Bounds.Height > 0d ? Bounds.Height : SwapedHeight;
             if (value)
+            {
                 StartHeightAnimation(SwapedHeight - start, start, SwapedHeight);
+            }
             else
             {
                 var full = MeasureExpandedHeight();
@@ -534,18 +530,18 @@ public class MyCard : Grid
             var targetAngle = value ? SwapLogoRight ? 270d : 0d : 180d;
             if (ContainerAnimation.CanAnimate(this))
             {
-                AniStart(
-                    AaRotateTransform(
+                AnimationService.Run(
+                    new RotateTransformAnimation(
                         _mainSwap,
                         targetAngle - rotate.Angle,
                         250,
-                        ease: new AniEaseOutFluent(AniEasePower.ExtraStrong)),
+                        ease: new FluentEaseOut(EasePower.ExtraStrong)),
                     SwapAnimationKey,
                     true);
             }
             else
             {
-                AniStop(SwapAnimationKey);
+                AnimationService.CancelAnimationByName(SwapAnimationKey);
                 rotate.Angle = targetAngle;
             }
         }
@@ -683,11 +679,11 @@ public class MyCard : Grid
         if (_isDisposing) return;
         _isDisposing = true;
 
-        AniStop(HeightAnimationKey);
+        AnimationService.CancelAnimationByName(HeightAnimationKey);
         _isHeightAnimating = false;
         ApplyLayoutClip();
 
-        PCL.Animations.AniDispose(
+        AnimationService.DisposeControl(
             this,
             removeFromChildren,
             _ => callBack?.Invoke(this),
@@ -805,23 +801,23 @@ public class MyCard : Grid
             || brush is not ISolidColorBrush targetBrush
             || current is not ISolidColorBrush currentBrush)
         {
-            AniStop(name);
+            AnimationService.CancelAnimationByName(name);
             target.SetValue(property, brush);
             return;
         }
 
-        var delta = new MyColor(targetBrush) - ContainerAnimation.ColorOf(currentBrush);
-        if (Math.Abs(delta.a) < 0.01d
-            && Math.Abs(delta.r) < 0.01d
-            && Math.Abs(delta.g) < 0.01d
-            && Math.Abs(delta.b) < 0.01d)
+        var delta = new NColor(targetBrush) - ContainerAnimation.ColorOf(currentBrush);
+        if (Math.Abs(delta.A) < 0.01d
+            && Math.Abs(delta.R) < 0.01d
+            && Math.Abs(delta.G) < 0.01d
+            && Math.Abs(delta.B) < 0.01d)
         {
             // 已经到位：停掉可能仍在进行的反向过渡，避免颜色继续走向旧目标
-            AniStop(name);
+            AnimationService.CancelAnimationByName(name);
             return;
         }
 
-        AniStart(AaColor(target, property, delta, time), name);
+        AnimationService.Run(new ColorAnimation(target, property, delta, time), name);
     }
 
     private IBrush _ResolveTextBrush()
@@ -848,17 +844,24 @@ public class MyCard : Grid
 
         if (!ContainerAnimation.CanAnimate(this) || !this.TryFindResource(colorKey, out _))
         {
-            AniStop(MouseAnimationKey);
-            ContainerTheme.BindDynamic(MainChrome, MyDropShadow.ColorProperty, colorKey);
+            AnimationService.CancelAnimationByName(MouseAnimationKey);
+            ContainerTheme.BindDynamic(MainChrome, CardShadow.ColorProperty, colorKey);
             MainChrome.Opacity = targetOpacity;
             return;
         }
 
-        AniStart(
-            new List<AniData>
+        AnimationService.Run(
+            new List<IAnimation>
             {
-                AaColor(MainChrome, MyDropShadow.ColorProperty, colorKey, ShadowColorTime),
-                AaOpacity(MainChrome, targetOpacity - MainChrome.Opacity, ShadowColorTime)
+                new ColorAnimation(
+                    MainChrome,
+                    CardShadow.ColorProperty,
+                    colorKey,
+                    ShadowColorTime),
+                new OpacityAnimation(
+                    MainChrome,
+                    targetOpacity - MainChrome.Opacity,
+                    ShadowColorTime)
             },
             MouseAnimationKey);
     }

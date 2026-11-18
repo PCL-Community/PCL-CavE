@@ -31,6 +31,8 @@ public abstract class MyMsgDialogBase : UserControl
 
     private const int ExitDuration = 150;
 
+    private const double BodyScrollBarOverlap = 3d;
+
     private readonly MyScrollViewer _bodyScroll;
     private readonly MyButton[] _buttons;
 
@@ -49,7 +51,7 @@ public abstract class MyMsgDialogBase : UserControl
 
     protected MyMsgDialogBase(DialogViewModel dialog)
     {
-        using var controlScope = PCL.Animations.SuspendControl();
+        using var controlScope = AnimationService.SuspendControl();
 
         Dialog = dialog;
         Focusable = true;
@@ -82,8 +84,9 @@ public abstract class MyMsgDialogBase : UserControl
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            ScrollBarMargin = new Thickness(-2d, 0d, -BodyScrollBarOverlap, 0d),
             Margin = new Thickness(0d, 0d, 0d, 17d),
-            Padding = new Thickness(7d, 0d, 15d, 0d),
+            Padding = new Thickness(7d, 0d, 6d, 0d),
             DeltaMult = 0.7d
         };
 
@@ -99,8 +102,10 @@ public abstract class MyMsgDialogBase : UserControl
         {
             var button = new MyButton
             {
+                Height = 32d,
+                VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(12d, 0d, 0d, 0d),
-                TextPadding = new Thickness(7d),
+                TextPadding = new Thickness(7d, 0d),
                 Padding = new Thickness(5d, 0d)
             };
             var number = index + 1;
@@ -116,7 +121,7 @@ public abstract class MyMsgDialogBase : UserControl
         {
             Margin = new Thickness(22d, 22d, 22d, 23d),
             VerticalAlignment = VerticalAlignment.Top,
-            RowDefinitions = new RowDefinitions("Auto,2,13,*,Auto,Auto")
+            RowDefinitions = new RowDefinitions("Auto,2,13,*,Auto,Auto,1*")
         };
         Grid.SetRow(LabTitle, 0);
         Grid.SetRow(shapeLine, 1);
@@ -134,6 +139,7 @@ public abstract class MyMsgDialogBase : UserControl
             CornerRadius = new CornerRadius(DialogTheme.CardCornerRadius),
             BorderThickness = new Thickness(0d),
             BoxShadow = BoxShadows.Parse("0 2 20 0 #CC3C3C3C"),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             Child = main
         };
         DialogTheme.BindBrush(card, Border.BackgroundProperty, "ColorBrushBackground");
@@ -186,22 +192,22 @@ public abstract class MyMsgDialogBase : UserControl
             return;
         }
 
-        PCL.Animations.AniStart(
-            new List<PCL.Animations.AniData>
+        AnimationService.Run(
+            new List<IAnimation>
             {
-                PCL.Animations.AaOpacity(this, 1d, 120, 60),
-                PCL.Animations.AaDouble(
+                new OpacityAnimation(this, 1d, 120, 60),
+                new DoubleAnimation(
                     delta => _translate.Y += delta,
                     -_translate.Y,
                     EnterDuration,
                     60,
-                    new PCL.Animations.AniEaseOutBack(PCL.Animations.AniEasePower.Weak)),
-                PCL.Animations.AaDouble(
+                    new BackEaseWithPowerOut(EasePower.Weak)),
+                new DoubleAnimation(
                     delta => _rotate.Angle += delta,
                     -_rotate.Angle,
                     EnterDuration,
                     60,
-                    new PCL.Animations.AniEaseOutFluent(PCL.Animations.AniEasePower.Weak))
+                    new FluentEaseOut(EasePower.Weak))
             },
             "MyMsg Enter " + GetHashCode());
     }
@@ -217,33 +223,33 @@ public abstract class MyMsgDialogBase : UserControl
             return;
         }
 
-        PCL.Animations.AniStart(
-            new List<PCL.Animations.AniData>
+        AnimationService.Run(
+            new List<IAnimation>
             {
-                PCL.Animations.AaOpacity(this, -Opacity, 80, 20),
-                PCL.Animations.AaDouble(
+                new OpacityAnimation(this, -Opacity, 80, 20),
+                new DoubleAnimation(
                     delta => _translate.Y += delta,
                     ExitOffsetY - _translate.Y,
                     ExitDuration,
                     0,
-                    new PCL.Animations.AniEaseOutFluent()),
-                PCL.Animations.AaDouble(
+                    new FluentEaseOut()),
+                new DoubleAnimation(
                     delta => _rotate.Angle += delta,
                     ExitAngle - _rotate.Angle,
                     ExitDuration,
                     0,
-                    new PCL.Animations.AniEaseInFluent(PCL.Animations.AniEasePower.Weak)),
-                PCL.Animations.AaCode(() => completed?.Invoke(), after: true)
+                    new FluentEaseIn(EasePower.Weak)),
+                new ActionAnimation(() => completed?.Invoke(), true)
             },
             "MyMsg Exit " + GetHashCode());
     }
 
     private bool _CanAnimateDialog()
     {
-        return PCL.Animations.AniSpeed > 0d
+        return AnimationService.Speed > 0d
             && IsLoaded
             && TopLevel.GetTopLevel(this) is not null
-            && !PCL.Animations.AniExitsAnyControl();
+            && !AnimationService.IsSuspended;
     }
 
     /// <summary>取第 <paramref name="number" /> 个按钮（从 1 开始）。</summary>
@@ -268,7 +274,11 @@ public abstract class MyMsgDialogBase : UserControl
     /// <summary>调整正文内边距。</summary>
     protected void SetBodyPadding(Thickness padding)
     {
-        _bodyScroll.Padding = padding;
+        _bodyScroll.Padding = new Thickness(
+            padding.Left,
+            padding.Top,
+            padding.Right - BodyScrollBarOverlap,
+            padding.Bottom);
     }
 
     /// <summary>写入页脚控件；页脚固定在滚动区下方，不随正文滚动。</summary>

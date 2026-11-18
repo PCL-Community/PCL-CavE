@@ -1,9 +1,8 @@
 <!-- Formatted by xaml-lang-formatter at 2026-06-28T17:16:52. -->
-<ResourceDictionary
-    xmlns="https://github.com/avaloniaui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
-    xml:space="preserve">
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+                    xml:space="preserve">
 
     <!-- Meta -->
 
@@ -61,22 +60,8 @@
 
     <!-- Main.Menu -->
 
-    <sys:String x:Key="Main.Menu.File">File</sys:String>
-    <sys:String x:Key="Main.Menu.Edit">Edit</sys:String>
-    <sys:String x:Key="Main.Menu.Window">Window</sys:String>
     <sys:String x:Key="Main.Menu.Help">Help</sys:String>
-    <sys:String x:Key="Main.Menu.About">About PCL CE</sys:String>
-    <sys:String x:Key="Main.Menu.Preferences">Preferences…</sys:String>
-    <sys:String x:Key="Main.Menu.Hide">Hide PCL CE</sys:String>
-    <sys:String x:Key="Main.Menu.Quit">Quit PCL CE</sys:String>
-    <sys:String x:Key="Main.Menu.CloseWindow">Close window</sys:String>
     <sys:String x:Key="Main.Menu.Minimize">Minimise</sys:String>
-    <sys:String x:Key="Main.Menu.Undo">Undo</sys:String>
-    <sys:String x:Key="Main.Menu.Redo">Redo</sys:String>
-    <sys:String x:Key="Main.Menu.Cut">Cut</sys:String>
-    <sys:String x:Key="Main.Menu.Copy">Copy</sys:String>
-    <sys:String x:Key="Main.Menu.Paste">Paste</sys:String>
-    <sys:String x:Key="Main.Menu.SelectAll">Select all</sys:String>
 
     <!-- Common.Action -->
 
@@ -2178,6 +2163,9 @@
     <sys:String x:Key="Minecraft.Launch.Donate.Title">{0} launches!</sys:String>
     <sys:String x:Key="Minecraft.Launch.ExportScript.Cancelled">Exporting launch script cancelled!</sys:String>
     <sys:String x:Key="Minecraft.Launch.ExportScript.Success">Launch script exported successfully!</sys:String>
+    <sys:String x:Key="Minecraft.Launch.Script.Title">Launch - {0}</sys:String>
+    <sys:String x:Key="Minecraft.Launch.Script.Starting">The game is starting, please wait.</sys:String>
+    <sys:String x:Key="Minecraft.Launch.Script.Exited">The game has exited.</sys:String>
     <sys:String x:Key="Minecraft.Launch.PurchaseHint.Later">Nah, maybe next time</sys:String>
     <sys:String x:Key="Minecraft.Launch.PurchaseHint.Message">It looks like you haven't purchased the game...&#xA;If you think Minecraft is good, consider purchasing it to support the developers... Don't keep freeloading.&#xA;&#xA;This prompt will no longer appear after you verify a valid Microsoft account!</sys:String>
     <sys:String x:Key="Minecraft.Launch.PurchaseHint.Purchase">Purchase!</sys:String>
@@ -2927,9 +2915,9 @@
 
     <sys:String x:Key="Setup.Misc.Debug.AnimationSpeed">Animation speed</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol">Linux display protocol</sys:String>
-    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto">Auto (X11)</sys:String>
+    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto">Auto ({0})</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.ToolTip">Select the display protocol used on Linux. A restart is required.&#xA;This setting will be overrided if PCL_FORCE_X11 and PCL_USE_WAYLAND environment variables are used.</sys:String>
-    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip">Follow the launcher default (X11).</sys:String>
+    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip">Follow the launcher default ({0}).</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.X11.ToolTip">Use X11/XWayland. This is currently the most stable option for compatibility and frame pacing.</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Wayland.ToolTip">Use native Wayland. Experimental and animation stutter or window behaviour differences may occur.</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Restart">Display protocol saved. Restart the launcher to apply it.</sys:String>
@@ -2960,6 +2948,7 @@
     <sys:String x:Key="Setup.Misc.Network.Proxy.Password">Password</sys:String>
     <sys:String x:Key="Setup.Misc.Network.Proxy.System">Use system proxy</sys:String>
     <sys:String x:Key="Setup.Misc.Network.Proxy.UntrustedWarning">Do not enter untrusted proxy addresses</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.Proxy.CustomHint">e.g. http://127.0.0.1:1080/</sys:String>
     <sys:String x:Key="Setup.Misc.Network.Proxy.Username">Account</sys:String>
 
     <!-- Setup.Misc.System -->
@@ -3062,7 +3051,6 @@
     <sys:String x:Key="Setup.Ui.Basic.LockWindow">Lock launcher size</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Opacity">Opacity</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Opacity2">Opacity</sys:String>
-    <sys:String x:Key="Setup.Ui.Basic.ShowLogo">Display the PCL CE logo whilst opening the launcher</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.ShowTriviaHint">Show 'Trivia' when launching the game</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Title">Basics</sys:String>
 
@@ -3210,8 +3198,8 @@
     <sys:String x:Key="Setup.Update.CheckAgain">Check again</sys:String>
     <sys:String x:Key="Setup.Update.CheckFailed">Failed to check for updates</sys:String>
     <sys:String x:Key="Setup.Update.Checking">Checking for updates...</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">Download .NET 10 Runtime</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.Message">A launcher update (version {0}) was found, but the new version requires .NET 10 to be installed on your computer.&#xA;You need to install .NET 10 before continuing the update.&#xA;&#xA;Click the button below to open the webpage, then select {1} under '.NET Desktop Runtime' to download.</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">Download .NET 11 Runtime</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.Message">A launcher update (version {0}) was found, but the new version requires .NET 11 to be installed on your computer.&#xA;You need to install .NET 11 before continuing the update.&#xA;&#xA;Click the button below to open the webpage, then select {1} under '.NET Desktop Runtime' to download.</sys:String>
     <sys:String x:Key="Setup.Update.DotNetMissing.Title">Launcher update - missing runtime</sys:String>
     <sys:String x:Key="Setup.Update.Error.NetworkFailed">Unable to retrieve latest version information. Please check your network connection.</sys:String>
     <sys:String x:Key="Setup.Update.Install">Download and install</sys:String>
@@ -3280,7 +3268,7 @@
     <sys:String x:Key="SystemDialog.File.SelectTitle">Select file</sys:String>
     <sys:String x:Key="SystemDialog.Folder.OpenFailed.Message">Failed to open File Explorer. Try closing security software, such as 360 Total Security.&#xA;&#xA;Path: {0}</sys:String>
     <sys:String x:Key="SystemDialog.Folder.SelectTitle">Select folder</sys:String>
-    <sys:String x:Key="SystemDialog.Startup.DotNetRuntimeOutdated.Message">Your .NET Desktop Runtime is outdated or corrupted. Please reinstall .NET 10.</sys:String>
+    <sys:String x:Key="SystemDialog.Startup.DotNetRuntimeOutdated.Message">Your .NET Desktop Runtime is outdated or corrupted. Please reinstall .NET 11.</sys:String>
     <sys:String x:Key="SystemDialog.Startup.InitializationTitle">PCL CE failed to initialise</sys:String>
 
     <!-- SystemDialog.Error -->
@@ -3288,7 +3276,7 @@
     <sys:String x:Key="SystemDialog.Error.Detail.WithException">{0}&#xA;&#xA;Details:&#xA;{1}</sys:String>
     <sys:String x:Key="SystemDialog.Error.Message.WithLogExportGuidance">{0}&#xA;&#xA;When asking for help, do not close launcher. Export the logs now (Settings → View logs → Export logs), then send the exported log archive. A screenshot of this window alone is usually not enough to diagnose the problem.</sys:String>
     <sys:String x:Key="SystemDialog.Error.OperationFailed.Message">An error occurred whilst performing this operation.&#xA;&#xA;Operation:&#xA;{0}&#xA;&#xA;Details:&#xA;{1}</sys:String>
-    <sys:String x:Key="SystemDialog.Error.OperationFailed.RuntimeMessage">An error occurred whilst performing this operation.&#xA;&#xA;Operation:&#xA;{0}&#xA;&#xA;Details:&#xA;{1}&#xA;&#xA;A low-level system operation failed. Please try reinstalling .NET 10.</sys:String>
+    <sys:String x:Key="SystemDialog.Error.OperationFailed.RuntimeMessage">An error occurred whilst performing this operation.&#xA;&#xA;Operation:&#xA;{0}&#xA;&#xA;Details:&#xA;{1}&#xA;&#xA;A low-level system operation failed. Please try reinstalling .NET 11.</sys:String>
     <sys:String x:Key="SystemDialog.Error.Title">Error</sys:String>
     <sys:String x:Key="SystemDialog.Error.Unexpected.Message">An unexpected error occurred.</sys:String>
     <sys:String x:Key="SystemDialog.Error.Unexpected.Title">Unexpected error</sys:String>
@@ -3612,7 +3600,6 @@
 
     <sys:String x:Key="Tools.Test.Dependency.MissingTitle">Missing dependency</sys:String>
     <sys:String x:Key="Instance.Export.Task.Prefix">Export instance</sys:String>
-    <sys:String x:Key="Application.Loading.Status.Preparing">準備中</sys:String>
     <sys:String x:Key="Download.Feature.Migrating">正在遷移</sys:String>
     <sys:String x:Key="Download.Feature.Migrating.Description">正在遷移下載資料，請稍候。</sys:String>
     <sys:String x:Key="Download.Install.Finished">安裝完成</sys:String>

@@ -8,8 +8,6 @@ using PCL.Core.App.Localization;
 using PCL.Core.Logging;
 using PCL.Core.UI.Dialogs;
 using PCL.Network;
-using PCL.UI.Animations;
-using static PCL.Animations;
 
 namespace PCL.Views.Shell;
 
@@ -29,7 +27,7 @@ public sealed class ExitFlow
 
     public bool IsExiting { get; private set; }
 
-    private void OnClosing(object? sender, WindowClosingEventArgs e)
+    private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
         if (IsExiting) return;
 
@@ -39,7 +37,7 @@ public sealed class ExitFlow
 
         try
         {
-            if (!ConfirmDownloadingTasks())
+            if (!await ConfirmDownloadingTasksAsync())
             {
                 _running = false;
                 return;
@@ -67,21 +65,18 @@ public sealed class ExitFlow
         }
     }
 
-    private static bool ConfirmDownloadingTasks()
+    private static async Task<bool> ConfirmDownloadingTasksAsync()
     {
         if (!NetFacade.HasDownloadingTask()) return true;
 
-        var button = DialogService.Instance.Show(
-                    new TextDialogRequest
-                    {
-                        Title = Lang.Text("Common.Dialog.Title"),
-                        Content = Lang.Text("Main.Exit.HasDownloadingTask"),
-                        Buttons = DialogButtons.OkCancel,
-                        ForceWait = true
-                    })
-                .Result?.Button
-            ?? 0;
-        if (button != 1) return false;
+        var result = await DialogService.Instance.ShowAsync(
+            new TextDialogRequest
+            {
+                Title = Lang.Text("Common.Dialog.Title"),
+                Content = Lang.Text("Main.Exit.HasDownloadingTask"),
+                Buttons = DialogButtons.OkCancel
+            });
+        if (result.Button != 1) return false;
 
         Basics.RunInNewThread(
             () =>
@@ -112,11 +107,16 @@ public sealed class ExitFlow
         group.Children.Add(scale);
         root.RenderTransform = group;
 
-        AniStart(
-            new List<AniData>
+        AnimationService.Run(
+            new List<IAnimation>
             {
-                AaOpacity(root, -root.Opacity, 140, 40, new AniEaseOutFluent(AniEasePower.Weak)),
-                AaDouble(
+                new OpacityAnimation(
+                    root,
+                    -root.Opacity,
+                    140,
+                    40,
+                    new FluentEaseOut(EasePower.Weak)),
+                new DoubleAnimation(
                     value =>
                     {
                         scale.ScaleX += value;
@@ -124,26 +124,26 @@ public sealed class ExitFlow
                     },
                     0.88d - scale.ScaleX,
                     180),
-                AaDouble(
+                new DoubleAnimation(
                     value => translate.Y += value,
                     20d - translate.Y,
                     180,
                     0,
-                    new AniEaseOutFluent(AniEasePower.Weak)),
-                AaDouble(
+                    new FluentEaseOut(EasePower.Weak)),
+                new DoubleAnimation(
                     value => rotate.Angle += value,
                     0.6d - rotate.Angle,
                     180,
                     0,
-                    new AniEaseInoutFluent(AniEasePower.Weak)),
-                AaCode(
+                    new FluentEaseInOut(EasePower.Weak)),
+                new ActionAnimation(
                     () =>
                     {
                         _window.ShowInTaskbar = false;
                         _window.Hide();
                     },
                     210),
-                AaCode(ShutdownApplication, 230)
+                new ActionAnimation(ShutdownApplication, 230)
             },
             ExitAnimationKey);
     }

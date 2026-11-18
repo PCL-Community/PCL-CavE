@@ -5,13 +5,12 @@ using PCL.UI.Controls;
 namespace PCL.Views.Pages.Instance;
 
 /// <summary>
-///     存档管理左栏：在「存档信息」与「数据包」两个子页之间切换，并提供打开存档文件夹入口。
-///     数据包子页仅在存档数据版本支持数据包（17w47a 及以上）时显示；当前存档路径由
-///     <see cref="CurrentSave" /> 记录，右栏详情页与数据包页从路由参数或该字段读取。
+/// 存档管理左栏：在「存档信息」与「数据包」两个子页之间切换，并提供打开存档文件夹入口。 数据包子页仅在存档数据版本支持数据包（17w47a
+/// 及以上）时显示；当前存档路径由 <see cref="CurrentSave" /> 记录，右栏详情页与数据包页从路由参数或该字段读取。
 /// </summary>
 public partial class PageInstanceSavesLeft : MyPageLeft, IRefreshable
 {
-    private readonly List<(PageSubType SubType, MyListItem Item)> _items = [];
+    private readonly List<(SubPageId SubPage, MyListItem Item)> _items = [];
     private bool _building;
     private MyIconButton? _datapackRefresh;
 
@@ -21,10 +20,10 @@ public partial class PageInstanceSavesLeft : MyPageLeft, IRefreshable
         AnimatedControl = PanItem;
         DataContext = ViewModel;
 
-        ItemInfo.Tag = PageSubType.VersionSavesInfo;
-        ItemDatapack.Tag = PageSubType.VersionSavesDatapack;
-        _items.Add((PageSubType.VersionSavesInfo, ItemInfo));
-        _items.Add((PageSubType.VersionSavesDatapack, ItemDatapack));
+        ItemInfo.Tag = SubPageIds.VersionSavesInfo;
+        ItemDatapack.Tag = SubPageIds.VersionSavesDatapack;
+        _items.Add((SubPageIds.VersionSavesInfo, ItemInfo));
+        _items.Add((SubPageIds.VersionSavesDatapack, ItemDatapack));
 
         ItemInfo.Check += (_, _) => NavigateIfNeeded(ItemInfo);
         ItemDatapack.Check += (_, _) => NavigateIfNeeded(ItemDatapack);
@@ -61,7 +60,7 @@ public partial class PageInstanceSavesLeft : MyPageLeft, IRefreshable
         PageInstanceSavesLeftViewModel.Refresh();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         Current = this;
         ViewModel.Attach();
@@ -74,14 +73,6 @@ public partial class PageInstanceSavesLeft : MyPageLeft, IRefreshable
     {
     }
 
-    protected override void RefreshLocalization()
-    {
-        if (_datapackRefresh is not null)
-            ToolTip.SetTip(_datapackRefresh, PageInstanceSavesLeftViewModel.RefreshToolTip);
-        ApplyDatapackVisibility();
-        RefreshChecked();
-    }
-
     private void AttachDatapackButton()
     {
         _datapackRefresh = new MyIconButton
@@ -89,14 +80,14 @@ public partial class PageInstanceSavesLeft : MyPageLeft, IRefreshable
             SvgIcon = "lucide/refresh-cw",
             LogoScale = 0.85d
         };
-        ToolTip.SetTip(_datapackRefresh, PageInstanceSavesLeftViewModel.RefreshToolTip);
+        _datapackRefresh.SetLocalizedValue(ToolTip.TipProperty, "Common.Action.Refresh");
         _datapackRefresh.Click += (_, _) => PageInstanceSavesLeftViewModel.Refresh();
         ItemDatapack.Buttons = [_datapackRefresh];
     }
 
     private void NavigateIfNeeded(MyListItem item)
     {
-        if (!_building && item.Tag is PageSubType target)
+        if (!_building && item.Tag is SubPageId target)
             PageInstanceSavesLeftViewModel.Navigate(target);
     }
 

@@ -1,11 +1,10 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using PCL.Views.Shell;
-using static PCL.Animations;
 
 namespace PCL.UI.Controls;
 
@@ -16,19 +15,14 @@ namespace PCL.UI.Controls;
 public class MyScrollViewer : ScrollViewer
 {
     private const double WheelScrollStep = 120d; // 一个滚轮刻度对应的像素数
+    private const int WheelAnimationTime = 300;
 
     public static readonly StyledProperty<Thickness> ScrollBarMarginProperty =
         AvaloniaProperty.Register<MyScrollViewer, Thickness>(nameof(ScrollBarMargin));
-    private const int WheelAnimationTime = 300;
-    private const string VerticalBarPartName = "PART_VerticalScrollBar";
-    private const string HorizontalBarPartName = "PART_HorizontalScrollBar";
 
     private double _realOffset;
-
-    /// <summary>模板中的水平滚动条；模板应用后可用。</summary>
-    public MyScrollBar? horizontalScrollBar;
-
-    public MyScrollBar? scrollBar;
+    private WindowBase? _window;
+    private bool _isRestoringFocus;
 
     public MyScrollViewer()
     {
@@ -64,14 +58,10 @@ public class MyScrollViewer : ScrollViewer
         if (e.Source is Control source && !GetBringIntoViewOnFocusChange(source))
             return;
 
-        base.OnGotFocus(e);
-    }
+        if (_isRestoringFocus)
+            return;
 
-    protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
-    {
-        base.OnApplyTemplate(e);
-        scrollBar = e.NameScope.Find<MyScrollBar>(VerticalBarPartName);
-        horizontalScrollBar = e.NameScope.Find<MyScrollBar>(HorizontalBarPartName);
+        base.OnGotFocus(e);
     }
 
     /// <summary>按像素增量滚动垂直偏移；动画关闭或控件未加载时直接落到目标位置。</summary>
@@ -87,8 +77,8 @@ public class MyScrollViewer : ScrollViewer
         }
 
         // 不具名：连续滚轮事件各自独立叠加；越界由 Clamp 挡在 [0, 可滚动高度]
-        AniStart(
-            AaDouble(
+        AnimationService.Run(
+            new DoubleAnimation(
                 animDelta =>
                 {
                     _realOffset = Math.Clamp(_realOffset + animDelta, 0d, MaximumOffset);
@@ -97,7 +87,7 @@ public class MyScrollViewer : ScrollViewer
                 target,
                 WheelAnimationTime,
                 0,
-                new AniEaseOutFluent((AniEasePower)6)));
+                new FluentEaseOut((EasePower)6)));
     }
 
     private void OnPreviewPointerWheel(object? sender, PointerWheelEventArgs e)
@@ -138,6 +128,28 @@ public class MyScrollViewer : ScrollViewer
         return false;
     }
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        _window = TopLevel.GetTopLevel(this) as WindowBase;
+        if (_window is not null)
+            _window.Activated += OnWindowActivated;
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        if (_window is not null)
+            _window.Activated -= OnWindowActivated;
+        _window = null;
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void OnWindowActivated(object? sender, EventArgs e)
+    {
+        _isRestoringFocus = true;
+        Dispatcher.UIThread.Post(() => _isRestoringFocus = false);
+    }
+
     private void OnScrollChanged(object? sender, ScrollChangedEventArgs e)
     {
         _realOffset = Offset.Y;
@@ -145,7 +157,7 @@ public class MyScrollViewer : ScrollViewer
             NotifyBackButtonRefresh();
     }
 
-    private void NotifyBackButtonRefresh()
+    private static void NotifyBackButtonRefresh()
     {
         ExtraButtonsPanel.Current?.RefreshBackButton();
     }

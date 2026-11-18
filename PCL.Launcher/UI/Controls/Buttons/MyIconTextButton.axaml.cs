@@ -18,10 +18,6 @@ namespace PCL.UI.Controls;
 /// </summary>
 public partial class MyIconTextButton : Border
 {
-    public delegate void ChangeEventHandler(object? sender, bool raiseByMouse);
-
-    public delegate void CheckEventHandler(object? sender, bool raiseByMouse);
-
     public delegate void ClickEventHandler(object? sender, RouteEventArgs e);
 
     public enum ColorState
@@ -70,9 +66,9 @@ public partial class MyIconTextButton : Border
         ActualThemeVariantChanged += (_, _) => RefreshColor(false);
         Unloaded += (_, _) =>
         {
-            PCL.Animations.AniStop(BackgroundKey);
-            PCL.Animations.AniStop(ForegroundKey);
-            PCL.Animations.AniStop(IconKey);
+            AnimationService.CancelAnimationByName(BackgroundKey);
+            AnimationService.CancelAnimationByName(ForegroundKey);
+            AnimationService.CancelAnimationByName(IconKey);
         };
     }
 
@@ -172,10 +168,6 @@ public partial class MyIconTextButton : Border
 
     private string IconKey => ButtonAnimation.Name("MyIconTextButton Icon", Uuid);
 
-    public event CheckEventHandler? Check;
-
-    public event ChangeEventHandler? Change;
-
     public event ClickEventHandler? Click;
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -227,7 +219,7 @@ public partial class MyIconTextButton : Border
             this,
             BackgroundProperty,
             background ?? string.Empty,
-            background is null ? new MyColor(Colors.Transparent) : null,
+            background is null ? (NColor?)new NColor(Colors.Transparent) : null,
             time,
             animate,
             BackgroundKey);

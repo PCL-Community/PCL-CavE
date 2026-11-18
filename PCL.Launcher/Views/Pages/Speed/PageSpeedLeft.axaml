@@ -1,8 +1,10 @@
 <ui:MyPageLeft xmlns="https://github.com/avaloniaui"
                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+               xmlns:vm="using:PCL"
                xmlns:ui="using:PCL.UI.Controls"
                xmlns:loc="using:PCL.Core.UI"
-               x:CompileBindings="False"
+               x:DataType="vm:PageSpeedLeftViewModel"
+               x:CompileBindings="True"
                x:Class="PCL.Views.Pages.Speed.PageSpeedLeft"
                Width="200"
                HorizontalAlignment="Left"
@@ -19,13 +21,13 @@
             <LinearGradientBrush StartPoint="0%,50%"
                                  EndPoint="100%,50%">
                 <GradientStop Offset="0"
-                              Color="Transparent" />
+                              Color="{DynamicResource ColorObjectBg1}" />
                 <GradientStop Offset="0.02"
                               Color="{DynamicResource ColorObject3}" />
                 <GradientStop Offset="0.98"
                               Color="{DynamicResource ColorObject3}" />
                 <GradientStop Offset="1"
-                              Color="Transparent" />
+                              Color="{DynamicResource ColorObjectBg1}" />
             </LinearGradientBrush>
         </Rectangle.Fill>
     </Rectangle>
@@ -47,13 +49,13 @@
             <LinearGradientBrush StartPoint="0%,50%"
                                  EndPoint="100%,50%">
                 <GradientStop Offset="0"
-                              Color="Transparent" />
+                              Color="{DynamicResource ColorObjectBg1}" />
                 <GradientStop Offset="0.02"
                               Color="{DynamicResource ColorObject3}" />
                 <GradientStop Offset="0.98"
                               Color="{DynamicResource ColorObject3}" />
                 <GradientStop Offset="1"
-                              Color="Transparent" />
+                              Color="{DynamicResource ColorObjectBg1}" />
             </LinearGradientBrush>
         </Rectangle.Fill>
     </Rectangle>
@@ -76,13 +78,13 @@
             <LinearGradientBrush StartPoint="0%,50%"
                                  EndPoint="100%,50%">
                 <GradientStop Offset="0"
-                              Color="Transparent" />
+                              Color="{DynamicResource ColorObjectBg1}" />
                 <GradientStop Offset="0.02"
                               Color="{DynamicResource ColorObject3}" />
                 <GradientStop Offset="0.98"
                               Color="{DynamicResource ColorObject3}" />
                 <GradientStop Offset="1"
-                              Color="Transparent" />
+                              Color="{DynamicResource ColorObjectBg1}" />
             </LinearGradientBrush>
         </Rectangle.Fill>
     </Rectangle>
@@ -98,20 +100,21 @@
                FontSize="14"
                Foreground="{DynamicResource ColorBrush3}"
                Text="{loc:Loc Speed.Progress.RemainingThreads}" />
-    <Rectangle Grid.Row="14"
+    <Rectangle x:Name="LineThread"
+               Grid.Row="14"
                Height="2"
                Margin="25,7">
         <Rectangle.Fill>
             <LinearGradientBrush StartPoint="0%,50%"
                                  EndPoint="100%,50%">
                 <GradientStop Offset="0"
-                              Color="Transparent" />
+                              Color="{DynamicResource ColorObjectBg1}" />
                 <GradientStop Offset="0.02"
                               Color="{DynamicResource ColorObject3}" />
                 <GradientStop Offset="0.98"
                               Color="{DynamicResource ColorObject3}" />
                 <GradientStop Offset="1"
-                              Color="Transparent" />
+                              Color="{DynamicResource ColorObjectBg1}" />
             </LinearGradientBrush>
         </Rectangle.Fill>
     </Rectangle>

@@ -43,7 +43,7 @@ public static class UpdateManager
         {
             if (LauncherCommon.VersionBaseName.Contains("beta"))
                 return true;
-            return (int)Config.Update.UpdateChannel == 1;
+            return Config.Update.UpdateChannel == UpdateChannel.Beta;
         }
     }
 
@@ -51,11 +51,11 @@ public static class UpdateManager
     {
         try
         {
-            if (!IsCurrentVersionBeta || (int)Config.Update.UpdateChannel == 1)
+            if (!IsCurrentVersionBeta || Config.Update.UpdateChannel == UpdateChannel.Beta)
                 return remoteServer.IsLatest(
                     IsCurrentVersionBeta
-                        ? UpdateChannel.Beta
-                        : UpdateChannel.Stable,
+                        ? UpdateSourceChannel.Beta
+                        : UpdateSourceChannel.Stable,
                     SystemInfo.IsArm64System
                         ? UpdateArch.Arm64
                         : UpdateArch.X64,
@@ -65,14 +65,14 @@ public static class UpdateManager
                     : UpdateEnums.VersionStatus.NotLatest;
 
             var isNewerThanStable = remoteServer.IsLatest(
-                UpdateChannel.Stable,
+                UpdateSourceChannel.Stable,
                 SystemInfo.IsArm64System
                     ? UpdateArch.Arm64
                     : UpdateArch.X64,
                 SemVer.Parse(LauncherCommon.VersionBaseName),
                 LauncherCommon.VersionCode);
             var isBetaLatest = remoteServer.IsLatest(
-                UpdateChannel.Beta,
+                UpdateSourceChannel.Beta,
                 SystemInfo.IsArm64System
                     ? UpdateArch.Arm64
                     : UpdateArch.X64,
@@ -116,7 +116,7 @@ public static class UpdateManager
             try
             {
                 var version = remoteServer.GetLatestVersion(
-                    IsCurrentVersionBeta ? UpdateChannel.Beta : UpdateChannel.Stable,
+                    IsCurrentVersionBeta ? UpdateSourceChannel.Beta : UpdateSourceChannel.Stable,
                     SystemInfo.IsArm64System ? UpdateArch.Arm64 : UpdateArch.X64
                 );
 
@@ -128,32 +128,31 @@ public static class UpdateManager
                     return;
                 if (type == UpdateEnums.UpdateType.PromptOnly)
                 {
-                    LauncherCommon.RunInUi(() =>
-                    {
-                        if ((UpdateUi.Current?.ShowMessageBox(
-                                    Lang.Text(
-                                        "Update.Available",
-                                        LauncherCommon.VersionBaseName,
-                                        version.VersionName),
-                                    Lang.Text("Update.Title"),
-                                    Lang.Text("Update.Action"),
-                                    Lang.Text("Common.Action.Cancel"))
-                                ?? 0)
-                            == 1)
-                            UpdateUi.Current?.NavigateSetupUpdate();
-                    });
+                    if ((UpdateUi.Current?.ShowMessageBox(
+                                Lang.Text(
+                                    "Update.Available",
+                                    LauncherCommon.VersionBaseName,
+                                    version.VersionName),
+                                Lang.Text("Update.Title"),
+                                Lang.Text("Update.Action"),
+                                Lang.Text("Common.Action.Cancel"))
+                            ?? 0)
+                        == 1)
+                        UpdateUi.Current?.NavigateSetupUpdate();
                     return;
                     // 构造步骤加载器
                 }
 
-                var loaders = new List<Loading.LoaderBase>();
-                // 下载
-                loaders.AddRange(
-                    remoteServer.GetDownloadLoader(
-                        IsCurrentVersionBeta ? UpdateChannel.Beta : UpdateChannel.Stable,
+                List<Loading.LoaderBase> loaders =
+                [
+                    .. remoteServer.GetDownloadLoader(
+                        IsCurrentVersionBeta
+                            ? UpdateSourceChannel.Beta
+                            : UpdateSourceChannel.Stable,
                         SystemInfo.IsArm64System ? UpdateArch.Arm64 : UpdateArch.X64,
-                        dlTargetPath));
-                loaders.Add(
+                        dlTargetPath),
+
+
                     new Loading.LoaderTask<int, int>(
                         Lang.Text("Update.Task.Check"),
                         _ =>
@@ -165,7 +164,9 @@ public static class UpdateManager
                                         "Update.Error.Sha256Mismatch",
                                         version.Sha256,
                                         curHash));
-                        }));
+                        })
+                ];
+                // 下载
                 switch (type)
                 {
                     case UpdateEnums.UpdateType.UpdateNow:
@@ -190,10 +191,9 @@ public static class UpdateManager
                                 {
                                     isUpdateWaitingRestart = true;
                                     UpdateUi.Current?.ShowUpdateRestartButton(
-                                        Lang.Text(
-                                            "Main.Extra.UpdateRestart.ToolTipWithVersion",
-                                            LauncherCommon.VersionBaseName,
-                                            version.VersionName));
+                                        "Main.Extra.UpdateRestart.ToolTipWithVersion",
+                                        LauncherCommon.VersionBaseName,
+                                        version.VersionName);
                                 })
                             {
                                 show = false
@@ -213,7 +213,7 @@ public static class UpdateManager
                         _ =>
                         {
                             UpdateUi.Current?.UpdateSetupButton(
-                                Lang.Text("Update.Task.RestartInstall"),
+                                "Update.Task.RestartInstall",
                                 true);
                         })
                     {
@@ -221,7 +221,10 @@ public static class UpdateManager
                     });
                 // 启动
                 updateLoader =
-                    new Loading.LoaderCombo<JsonObject>(Lang.Text("Update.Title"), loaders);
+                    new Loading.LoaderCombo<JsonObject>(Lang.Text("Update.Title"), loaders)
+                    {
+                        DisplayNameFactory = () => Lang.Text("Update.Title")
+                    };
                 updateLoader.Start();
                 if (type == UpdateEnums.UpdateType.UpdateNow)
                 {
@@ -256,7 +259,7 @@ public static class UpdateManager
 
             // id old new restart
             var text =
-                $"update {Process.GetCurrentProcess().Id} \"{Basics.ExecutablePath}\" \"{fileName}\" {(triggerRestart ? "true" : "false")}";
+                $"update {Environment.ProcessId} \"{Basics.ExecutablePath}\" \"{fileName}\" {(triggerRestart ? "true" : "false")}";
             LauncherCommon.Log("[System] 更新程序启动，参数：" + text);
             Process.Start(
                 new ProcessStartInfo(fileName)
@@ -284,16 +287,13 @@ public static class UpdateManager
         }
     }
 
-    /// <summary>
-    ///     确保 PathTemp 下的 Latest.exe 是最新正式版的 PCL，它会被用于整合包打包。
-    ///     如果不是，则下载一个。
-    /// </summary>
+    /// <summary>确保 PathTemp 下的 Latest.exe 是最新正式版的 PCL，它会被用于整合包打包。 如果不是，则下载一个。</summary>
     internal static void DownloadLatestPcl(Loading.LoaderBase? loaderToSyncProgress = null)
     {
         // 注意：如果要自行实现这个功能，请换用另一个文件路径，以免与官方版本冲突
         var latestPclPath = Path.Combine(LauncherPaths.Temp, "CE-Latest.exe");
         var target = remoteServer.GetLatestVersion(
-            UpdateChannel.Stable,
+            UpdateSourceChannel.Stable,
             SystemInfo.IsArm64System ? UpdateArch.Arm64 : UpdateArch.X64);
         if (target is null)
             throw new Exception(Lang.Text("Update.Error.UnableToGetUpdate"));
@@ -312,11 +312,14 @@ public static class UpdateManager
         }
 
         var loaders = remoteServer.GetDownloadLoader(
-            UpdateChannel.Stable,
+            UpdateSourceChannel.Stable,
             SystemInfo.IsArm64System ? UpdateArch.Arm64 : UpdateArch.X64,
             latestPclPath);
         var loader =
-            new Loading.LoaderCombo<int>(Lang.Text("Update.Task.DownloadLatestStable"), loaders);
+            new Loading.LoaderCombo<int>(Lang.Text("Update.Task.DownloadLatestStable"), loaders)
+            {
+                DisplayNameFactory = () => Lang.Text("Update.Task.DownloadLatestStable")
+            };
         loader.Start();
         loader.WaitForExit();
     }
@@ -368,9 +371,7 @@ public static class UpdateManager
         }
     }
 
-    /// <summary>
-    ///     展示社区版提示
-    /// </summary>
+    /// <summary>展示社区版提示</summary>
     /// <param name="IsUpdate">是否为更新时启动</param>
     public static void ShowCeAnnounce()
     {

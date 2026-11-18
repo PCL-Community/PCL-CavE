@@ -37,7 +37,7 @@ internal static class UiInteraction
             });
     }
 
-    internal static int Message(
+    internal static async Task<int> MessageAsync(
         string text,
         string? title,
         string? button1,
@@ -48,20 +48,90 @@ internal static class UiInteraction
         Action? button2Action = null,
         Action? button3Action = null)
     {
+        var request = CreateMessageRequest(
+            text,
+            title,
+            button1,
+            button2,
+            button3,
+            isWarn,
+            button1Action,
+            button2Action,
+            button3Action);
+        return (await DialogService.Instance.ShowAsync(request)).Button;
+    }
+
+    internal static int MessageBlockingOnWorkerThread(
+        string text,
+        string? title,
+        string? button1,
+        string? button2 = "",
+        string? button3 = "",
+        bool isWarn = false,
+        Action? button1Action = null,
+        Action? button2Action = null,
+        Action? button3Action = null)
+    {
+        var request = CreateMessageRequest(
+            text,
+            title,
+            button1,
+            button2,
+            button3,
+            isWarn,
+            button1Action,
+            button2Action,
+            button3Action);
+        return DialogService.Instance.ShowBlockingOnWorkerThread(request).Button;
+    }
+
+    internal static void MessageNotification(
+        string text,
+        string? title,
+        string? button1,
+        string? button2 = "",
+        string? button3 = "",
+        bool isWarn = false,
+        Action? button1Action = null,
+        Action? button2Action = null,
+        Action? button3Action = null)
+    {
+        var request = CreateMessageRequest(
+            text,
+            title,
+            button1,
+            button2,
+            button3,
+            isWarn,
+            button1Action,
+            button2Action,
+            button3Action);
+        DialogService.Instance.ShowNotification(request);
+    }
+
+    private static TextDialogRequest CreateMessageRequest(
+        string text,
+        string? title,
+        string? button1,
+        string? button2,
+        string? button3,
+        bool isWarn,
+        Action? button1Action,
+        Action? button2Action,
+        Action? button3Action)
+    {
         var buttons = new List<DialogButton>();
         Add(button1, button1Action);
         Add(button2, button2Action);
         Add(button3, button3Action);
 
-        var request = new TextDialogRequest
+        return new TextDialogRequest
         {
             Title = title ?? "",
             Content = text,
             Buttons = buttons.Count == 0 ? DialogButtons.Ok : DialogButtons.From(buttons.ToArray()),
-            IsWarn = isWarn,
-            ForceWait = true
+            IsWarn = isWarn
         };
-        return DialogService.Instance.Show(request).Result?.Button ?? 0;
 
         void Add(string? buttonText, Action? action)
         {
@@ -70,55 +140,93 @@ internal static class UiInteraction
         }
     }
 
-    internal static string? Input(string title, string content = "", string defaultValue = "")
+    internal static async Task<string?> InputAsync(
+        string title,
+        string content = "",
+        string defaultValue = "")
     {
-        return DialogService.Instance.Show(
+        return (await DialogService.Instance.ShowAsync(
+            new InputDialogRequest
+            {
+                Title = title,
+                Content = content,
+                DefaultValue = defaultValue
+            })).InputText;
+    }
+
+    internal static string? InputBlockingOnWorkerThread(
+        string title,
+        string content = "",
+        string defaultValue = "")
+    {
+        return DialogService.Instance.ShowBlockingOnWorkerThread(
                 new InputDialogRequest
                 {
                     Title = title,
                     Content = content,
-                    DefaultValue = defaultValue,
-                    ForceWait = true
+                    DefaultValue = defaultValue
                 })
-            .Result?.InputText;
+            .InputText;
     }
 
-    internal static int? Select(string title, IReadOnlyList<string> options)
+    internal static async Task<int?> SelectAsync(string title, IReadOnlyList<string> options)
     {
-        return DialogService.Instance.Show(
+        return (await DialogService.Instance.ShowAsync(
+            new SelectDialogRequest
+            {
+                Title = title,
+                Options = CreateOptions(options)
+            })).SelectedIndex;
+    }
+
+    internal static int? SelectBlockingOnWorkerThread(string title, IReadOnlyList<string> options)
+    {
+        return DialogService.Instance.ShowBlockingOnWorkerThread(
                 new SelectDialogRequest
                 {
                     Title = title,
-                    Options =
-                    [
-                        .. options
-                            .Select(option => new DialogOption
-                            {
-                                Text = option
-                            })
-                    ],
-                    ForceWait = true
+                    Options = CreateOptions(options)
                 })
-            .Result?.SelectedIndex;
+            .SelectedIndex;
     }
 
-    internal static List<int>? MultiSelect(string title, IReadOnlyList<string> options)
+    internal static async Task<IReadOnlyList<int>?> MultiSelectAsync(
+        string title,
+        IReadOnlyList<string> options)
     {
-        return DialogService
-            .Instance.Show(
+        var result = await DialogService.Instance.ShowAsync(
+            new SelectDialogRequest
+            {
+                Title = title,
+                Options = CreateOptions(options),
+                MultiSelect = true
+            });
+        return result.SelectedIndices;
+    }
+
+    internal static IReadOnlyList<int>? MultiSelectBlockingOnWorkerThread(
+        string title,
+        IReadOnlyList<string> options)
+    {
+        return DialogService.Instance.ShowBlockingOnWorkerThread(
                 new SelectDialogRequest
                 {
                     Title = title,
-                    Options = options
-                        .Select(option => new DialogOption
-                        {
-                            Text = option
-                        })
-                        .ToArray(),
-                    MultiSelect = true,
-                    ForceWait = true
+                    Options = CreateOptions(options),
+                    MultiSelect = true
                 })
-            .Result?.SelectedIndices?.ToList();
+            .SelectedIndices;
+    }
+
+    private static DialogOption[] CreateOptions(IReadOnlyList<string> options)
+    {
+        return
+        [
+            .. options.Select(option => new DialogOption
+            {
+                Text = option
+            })
+        ];
     }
 
     internal static void OpenWebsite(string url)
@@ -144,9 +252,7 @@ internal static class UiInteraction
             desktop.Shutdown();
     }
 
-    /// <summary>
-    ///     更新完成后重启：交给生命周期在服务停止（含单实例锁释放）后以相同参数重新拉起当前可执行文件。
-    /// </summary>
+    /// <summary>更新完成后重启：交给生命周期在服务停止（含单实例锁释放）后以相同参数重新拉起当前可执行文件。</summary>
     internal static void Restart()
     {
         try
@@ -242,7 +348,7 @@ public sealed class UserInteractionBridge : IUserInteraction
         string? button1 = null,
         bool isWarn = false)
     {
-        UiInteraction.Message(text, title, button1, isWarn: isWarn);
+        UiInteraction.MessageNotification(text, title, button1, isWarn: isWarn);
     }
 
     public void OpenWebsite(string url)
@@ -256,7 +362,7 @@ public sealed class UserInteractionBridge : IUserInteraction
         string? confirmText = null,
         string? cancelText = null)
     {
-        return UiInteraction.Message(
+        return UiInteraction.MessageBlockingOnWorkerThread(
                 text,
                 title,
                 confirmText ?? Lang.Text("Common.Action.Confirm"),
@@ -279,7 +385,7 @@ public sealed class UpdateUiBridge : IUpdateUi
         Action? button2Action = null,
         Action? button3Action = null)
     {
-        return UiInteraction.Message(
+        return UiInteraction.MessageBlockingOnWorkerThread(
             caption,
             title,
             button1,
@@ -298,15 +404,15 @@ public sealed class UpdateUiBridge : IUpdateUi
 
     public void NavigateSetupUpdate()
     {
-        PageRouter.Navigate(PageType.Setup, PageSubType.SetupUpdate);
+        PageRouter.Navigate(PageIds.Setup, SubPageIds.SetupUpdate);
     }
 
-    public void ShowUpdateRestartButton(string tooltip)
+    public void ShowUpdateRestartButton(string tooltipKey, params object?[] args)
     {
         UiInteraction.TryShellAction(
             nameof(ShowUpdateRestartButton),
             "SHELL",
-            shell => shell.ShowUpdateRestartButton(tooltip));
+            shell => shell.ShowUpdateRestartButton(tooltipKey, args));
     }
 
     public void RefreshDownloadButton()
@@ -314,7 +420,7 @@ public sealed class UpdateUiBridge : IUpdateUi
         UiInteraction.RefreshDownloadButton(nameof(RefreshDownloadButton));
     }
 
-    public void UpdateSetupButton(string text, bool enabled)
+    public void UpdateSetupButton(string textKey, bool enabled, params object?[] args)
     {
         var page = PageSetupUpdate.Current
             ?? PageRouter.CurrentPage as PageSetupUpdate;
@@ -324,7 +430,7 @@ public sealed class UpdateUiBridge : IUpdateUi
             return;
         }
 
-        UiInteraction.RunOnUi(() => page.SetUpdateButton(text, enabled));
+        UiInteraction.RunOnUi(() => page.SetUpdateButton(textKey, enabled, args));
     }
 
     public void ExitApplication(bool restart)
@@ -373,7 +479,7 @@ public sealed class LaunchUiBridge : ILaunchUi
         bool forceWait = false,
         Action? button1Action = null)
     {
-        return UiInteraction.Message(
+        return UiInteraction.MessageBlockingOnWorkerThread(
             text,
             title,
             button1,
@@ -397,7 +503,12 @@ public sealed class LaunchUiBridge : ILaunchUi
 
     public int? ShowSelect(string caption, IReadOnlyList<string> options)
     {
-        return UiInteraction.Select(caption, options);
+        return UiInteraction.SelectBlockingOnWorkerThread(caption, options);
+    }
+
+    public Task<int?> ShowSelectAsync(string caption, IReadOnlyList<string> options)
+    {
+        return UiInteraction.SelectAsync(caption, options);
     }
 
     public void OpenExplorer(string path)
@@ -407,7 +518,7 @@ public sealed class LaunchUiBridge : ILaunchUi
 
     public void PrepareLaunchNavigation()
     {
-        PageRouter.Navigate(PageType.Launch);
+        PageRouter.Navigate(PageIds.Launch);
     }
 
     public void RefreshLaunchButtons()
@@ -493,7 +604,7 @@ public sealed class LaunchUiBridge : ILaunchUi
         // 导航与页面创建必须同处 UI 线程；PageLogLeft.Current 在宿主创建左页时同步赋值。
         UiInteraction.RunOnUi(() =>
         {
-            PageRouter.Navigate(PageType.GameLog);
+            PageRouter.Navigate(PageIds.GameLog);
             if (PageLogLeft.Current is { } sink)
             {
                 sink.AttachWatcher(watcher);
@@ -535,7 +646,7 @@ public sealed class CompUiBridge : ICompUi
         string? confirmText = null,
         string? cancelText = null)
     {
-        return UiInteraction.Select(title ?? caption, options);
+        return UiInteraction.SelectBlockingOnWorkerThread(title ?? caption, options);
     }
 
     public List<int>? ShowMultiSelect(
@@ -545,12 +656,12 @@ public sealed class CompUiBridge : ICompUi
         string? confirmText = null,
         string? cancelText = null)
     {
-        return UiInteraction.MultiSelect(title ?? caption, options);
+        return UiInteraction.MultiSelectBlockingOnWorkerThread(title ?? caption, options)?.ToList();
     }
 
     public string? ShowInput(string title, string text = "", string defaultInput = "")
     {
-        return UiInteraction.Input(title, text, defaultInput);
+        return UiInteraction.InputBlockingOnWorkerThread(title, text, defaultInput);
     }
 
     public void RefreshDownloadButton()
@@ -593,7 +704,24 @@ public sealed class CompUiBridge : ICompUi
         string? button3 = "",
         bool isWarn = false)
     {
-        return UiInteraction.Message(caption, title, button1, button2, button3, isWarn);
+        return UiInteraction.MessageBlockingOnWorkerThread(
+            caption,
+            title,
+            button1,
+            button2,
+            button3,
+            isWarn);
+    }
+
+    public Task<int> ShowDialogAsync(
+        string caption,
+        string? title,
+        string? button1,
+        string? button2 = "",
+        string? button3 = "",
+        bool isWarn = false)
+    {
+        return UiInteraction.MessageAsync(caption, title, button1, button2, button3, isWarn);
     }
 }
 
@@ -624,7 +752,7 @@ public sealed class WatcherUiBridge : IWatcherUi
 
     public void ShowFeedback()
     {
-        PageRouter.Navigate(PageType.Setup, PageSubType.SetupFeedback);
+        PageRouter.Navigate(PageIds.Setup, SubPageIds.SetupFeedback);
     }
 
     public void ShowHint(string text, NotificationType type = NotificationType.Info)

@@ -1,15 +1,12 @@
 using System.ComponentModel;
 using Avalonia.Controls;
-using PCL.Core.App.Localization;
 using PCL.UI.Controls;
-using static PCL.Animations;
 
 namespace PCL.Views.Pages.Launch;
 
 /// <summary>
-///     当前账号视图：皮肤头像、玩家名与验证方式，并提供皮肤与披风、修改信息、选择档案三个入口。
-///     档案信息与菜单命令由 <see cref="PageLoginProfileSkinViewModel" /> 负责，页面保留菜单、
-///     悬停动画与皮肤控件交互。
+/// 当前账号视图：皮肤头像、玩家名与验证方式，并提供皮肤与披风、修改信息、选择档案三个入口。 档案信息与菜单命令由
+/// <see cref="PageLoginProfileSkinViewModel" /> 负责，页面保留菜单、 悬停动画与皮肤控件交互。
 /// </summary>
 public partial class PageLoginProfileSkin : LoginPageBase
 {
@@ -45,8 +42,8 @@ public partial class PageLoginProfileSkin : LoginPageBase
         _btnSelect.Click += (_, _) => ViewModel.SelectProfileCommand.Execute(null);
         _skin.CapeRequested += (_, _) => ViewModel.ChangeCapeCommand.Execute(null);
 
-        PointerEntered += (_, _) => AniStart(
-            AaOpacity(_panButtons, 1d - _panButtons.Opacity, 120),
+        PointerEntered += (_, _) => AnimationService.Run(
+            new OpacityAnimation(_panButtons, 1d - _panButtons.Opacity, 120),
             "PageLoginProfileSkin Button");
         PointerExited += (_, _) =>
         {
@@ -54,9 +51,6 @@ public partial class PageLoginProfileSkin : LoginPageBase
                 return;
             HideButtons();
         };
-
-        AttachedToVisualTree += (_, _) => LocalizationService.LanguageChanged += Reload;
-        DetachedFromVisualTree += (_, _) => LocalizationService.LanguageChanged -= Reload;
     }
 
     public PageLoginProfileSkinViewModel ViewModel { get; } = new();
@@ -79,8 +73,8 @@ public partial class PageLoginProfileSkin : LoginPageBase
 
     private void HideButtons()
     {
-        AniStart(
-            AaOpacity(_panButtons, -_panButtons.Opacity, 120),
+        AnimationService.Run(
+            new OpacityAnimation(_panButtons, -_panButtons.Opacity, 120),
             "PageLoginProfileSkin Button");
     }
 
@@ -134,9 +128,9 @@ public partial class PageLoginProfileSkin : LoginPageBase
         {
             var item = new MyMenuItem
             {
-                Header = Lang.Text(headerKey),
                 SvgIcon = svgIcon
             };
+            item.SetLocalizedValue(MenuItem.HeaderProperty, headerKey);
             item.Click += (_, _) =>
             {
                 action();
@@ -176,9 +170,9 @@ public partial class PageLoginProfileSkin : LoginPageBase
         {
             var item = new MyMenuItem
             {
-                Header = Lang.Text(headerKey),
                 SvgIcon = svgIcon
             };
+            item.SetLocalizedValue(MenuItem.HeaderProperty, headerKey);
             item.Click += (_, _) =>
             {
                 action();

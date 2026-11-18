@@ -13,8 +13,8 @@ using PCL.UI.Controls;
 namespace PCL.Views.Shell;
 
 /// <summary>
-///     主窗口右下角的快捷按钮组：更新重启、返回顶部、任务管理、愚人节、关闭游戏、游戏日志、背景音乐。
-///     每个按钮通过 <see cref="MyExtraButton.showCheck" /> 按实时状态显隐，状态在页面切换与定时轮询时刷新。
+/// 主窗口右下角的快捷按钮组：更新重启、返回顶部、任务管理、愚人节、关闭游戏、游戏日志、背景音乐。 每个按钮通过
+/// <see cref="MyExtraButton.showCheck" /> 按实时状态显隐，状态在页面切换与定时轮询时刷新。
 /// </summary>
 public sealed class ExtraButtonsPanel : StackPanel
 {
@@ -30,8 +30,9 @@ public sealed class ExtraButtonsPanel : StackPanel
 
     private readonly MyExtraButton _updateRestart;
     private ScrollViewer? _hookedScroll;
+    private object?[]? _updateRestartTooltipArgs;
 
-    private string? _updateRestartTooltip;
+    private string? _updateRestartTooltipKey;
 
     public ExtraButtonsPanel()
     {
@@ -67,10 +68,10 @@ public sealed class ExtraButtonsPanel : StackPanel
         _updateRestart.showCheck = () => UpdateManager.isUpdateWaitingRestart;
         _backToTop.showCheck = CanScrollToTop;
         _download.showCheck = () => NetFacade.HasDownloadingTask()
-            && PageRouter.Current.Page != PageType.TaskManager;
+            && PageRouter.Current.Page != PageIds.TaskManager;
         _april.showCheck = () => Basics.IsAprilFool
             && !IsAprilGiveup
-            && PageRouter.Current.Page == PageType.Launch;
+            && PageRouter.Current.Page == PageIds.Launch;
         _shutdown.showCheck = () => GameWatcher.hasRunningMinecraft;
         _log.showCheck = ShowLogButton;
         _music.showCheck = () => MusicStateProvider?.Invoke() is { Visible: true }
@@ -117,15 +118,16 @@ public sealed class ExtraButtonsPanel : StackPanel
         _download.Progress = Math.Clamp(Loading.loaderTaskbarProgress, 0d, 1d);
     }
 
-    public void ShowUpdateRestartButton(string tooltip)
+    public void ShowUpdateRestartButton(string tooltipKey, params object?[] args)
     {
         if (!Dispatcher.UIThread.CheckAccess())
         {
-            Dispatcher.UIThread.Post(() => ShowUpdateRestartButton(tooltip));
+            Dispatcher.UIThread.Post(() => ShowUpdateRestartButton(tooltipKey, args));
             return;
         }
 
-        _updateRestartTooltip = tooltip;
+        _updateRestartTooltipKey = tooltipKey;
+        _updateRestartTooltipArgs = args;
         _updateRestart.Show = true;
         ApplyUpdateRestartTooltip();
     }
@@ -209,7 +211,7 @@ public sealed class ExtraButtonsPanel : StackPanel
             SvgIcon = icon,
             Show = false
         };
-        if (!string.IsNullOrEmpty(tipKey)) ToolTip.SetTip(button, Lang.Text(tipKey));
+        if (!string.IsNullOrEmpty(tipKey)) button.SetLocalizedValue(ToolTip.TipProperty, tipKey);
         button.Click += (_, _) => action();
         Children.Add(button);
         return button;
@@ -217,21 +219,27 @@ public sealed class ExtraButtonsPanel : StackPanel
 
     private void RefreshUpdateRestartTooltip()
     {
-        if (_updateRestartTooltip is not null)
+        if (_updateRestartTooltipKey is not null)
         {
             ApplyUpdateRestartTooltip();
             return;
         }
 
-        var tip = Lang.Text("Main.Extra.UpdateRestart.ToolTip");
-        if (!string.Equals(ToolTip.GetTip(_updateRestart) as string, tip, StringComparison.Ordinal))
-            ToolTip.SetTip(_updateRestart, tip);
+        _updateRestart.SetLocalizedValue(
+            ToolTip.TipProperty,
+            "Main.Extra.UpdateRestart.ToolTip");
     }
 
     private void ApplyUpdateRestartTooltip()
     {
-        if (_updateRestartTooltip is not null)
-            ToolTip.SetTip(_updateRestart, _updateRestartTooltip);
+        if (_updateRestartTooltipKey is null) return;
+
+        var key = _updateRestartTooltipKey;
+        var args = _updateRestartTooltipArgs ?? [];
+        LocalizedText.Bind(
+            _updateRestart,
+            ToolTip.TipProperty,
+            () => Lang.Text(key, args));
     }
 
     private void RefreshMusicAppearance()
@@ -262,7 +270,7 @@ public sealed class ExtraButtonsPanel : StackPanel
     private static bool ShowLogButton()
     {
         if (GameLogProvider is null) return false;
-        if (PageRouter.Current.Page == PageType.GameLog) return false;
+        if (PageRouter.Current.Page == PageIds.GameLog) return false;
         return GameLogProvider?.Invoke() ?? GameWatcher.mcWatcherList.Count > 0;
     }
 
@@ -270,7 +278,7 @@ public sealed class ExtraButtonsPanel : StackPanel
     {
         var scroll = CurrentScroll;
         if (scroll is not { IsVisible: true }) return false;
-        var windowHeight = MainWindow.Current?.Bounds.Height ?? 500d;
+        var windowHeight = (TopLevel.GetTopLevel(Current) as Window)?.Bounds.Height ?? 500d;
         return scroll.Offset.Y > windowHeight + (Current?._backToTop.Show == true ? 0d : 700d);
     }
 
@@ -288,12 +296,12 @@ public sealed class ExtraButtonsPanel : StackPanel
 
     private static void ShowTaskManager()
     {
-        PageRouter.Navigate(PageType.TaskManager);
+        PageRouter.Navigate(PageIds.TaskManager);
     }
 
     private static void ShowGameLog()
     {
-        PageRouter.Navigate(PageType.GameLog);
+        PageRouter.Navigate(PageIds.GameLog);
     }
 
     private static void UpdateRestart()

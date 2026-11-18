@@ -4,19 +4,18 @@ using Avalonia.Threading;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Localization;
+using PCL.Core.Platform;
 using PCL.Core.UI.Hints;
 using PCL.Core.Utils.OS;
 using PCL.Core.Utils.Validate;
 using PCL.Navigation;
 using PCL.UI.Controls;
-using static PCL.Animations;
 
 namespace PCL.Views.Pages.Setup;
 
 /// <summary>
-///     启动设置页：实例隔离、窗口标题/大小/优先级、内存分配与 JVM/游戏参数。
-///     状态与配置写入由 <see cref="PageSetupLaunchViewModel" /> 负责，页面仅处理视图生命周期、
-///     用户选择确认、内存占用条动画与动态文本排布。
+/// 启动设置页：实例隔离、窗口标题/大小/优先级、内存分配与 JVM/游戏参数。 状态与配置写入由
+/// <see cref="PageSetupLaunchViewModel" /> 负责，页面仅处理视图生命周期、 用户选择确认、内存占用条动画与动态文本排布。
 /// </summary>
 public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
 {
@@ -37,19 +36,17 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
         PanScroll = PanBack;
         DataContext = ViewModel;
 
-        var java = PCL.Core.Platform.PlatformRuntime.Current.Java;
+        var java = PlatformRuntime.Current.Java;
         CheckAdvanceNoJavaw.IsEnabled = java.SupportsJavaw;
         if (!java.SupportsJavaw)
-            ToolTip.SetTip(
-                CheckAdvanceNoJavaw,
-                Lang.Text("Setup.Launch.Advanced.UseJavaExe.Unsupported"));
+            CheckAdvanceNoJavaw.SetLocalizedValue(
+                ToolTip.TipProperty,
+                "Setup.Launch.Advanced.UseJavaExe.Unsupported");
 
         SliderRamCustom.getHintText = new Func<object, object>(value =>
-            Lang.Number(PageSetupLaunchViewModel.GetRamFromTick(Convert.ToInt32(value)), "N1")
-            + " GiB");
+            $"{Lang.Number(PageSetupLaunchViewModel.GetRamFromTick(Convert.ToInt32(value)), "N1")} GiB");
         SliderRamInitialCustom.getHintText = new Func<object, object>(value =>
-            Lang.Number(PageSetupLaunchViewModel.GetRamFromTick(Convert.ToInt32(value)), "N1")
-            + " GiB");
+            $"{Lang.Number(PageSetupLaunchViewModel.GetRamFromTick(Convert.ToInt32(value)), "N1")} GiB");
 
         TextArgumentInfo.ValidateRules.Add(new BlacklistValidator(["\"", "\u201c", "\u201d"]));
         TextArgumentInfo.ValidatedTextChanged += (_, _) =>
@@ -111,7 +108,7 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
         Reload();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack.ScrollToHome();
         _isActive = true;
@@ -123,14 +120,6 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
     public override void OnNavigatedFrom()
     {
         _isActive = false;
-    }
-
-    protected override void RefreshLocalization()
-    {
-        if (!_loaded) return;
-        RefreshDisableJlwToolTip();
-        Reload();
-        RefreshRamVisual(false);
     }
 
     public void Reload()
@@ -316,30 +305,30 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
         const string animationKey = "SetupLaunch Ram Grid";
         if (ContainerAnimation.CanAnimate(this))
         {
-            AniStart(
-                new[]
+            AnimationService.Run(
+                new List<IAnimation>
                 {
-                    AaGridLengthWidth(
+                    new GridLengthWidthAnimation(
                         columns[0],
                         state.Used - columns[0].Width.Value,
                         800,
-                        ease: new AniEaseOutFluent(AniEasePower.Strong)),
-                    AaGridLengthWidth(
+                        ease: new FluentEaseOut(EasePower.Strong)),
+                    new GridLengthWidthAnimation(
                         columns[1],
                         state.GameActual - columns[1].Width.Value,
                         800,
-                        ease: new AniEaseOutFluent(AniEasePower.Strong)),
-                    AaGridLengthWidth(
+                        ease: new FluentEaseOut(EasePower.Strong)),
+                    new GridLengthWidthAnimation(
                         columns[2],
                         Math.Max(state.Empty, 0.001d) - columns[2].Width.Value,
                         800,
-                        ease: new AniEaseOutFluent(AniEasePower.Strong))
+                        ease: new FluentEaseOut(EasePower.Strong))
                 },
                 animationKey);
             return;
         }
 
-        AniStop(animationKey);
+        AnimationService.CancelAnimationByName(animationKey);
         SetRamColumnWidths(state);
     }
 
@@ -382,12 +371,15 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
             };
             var totalOpacity = left == 0 ? 0d : 1d;
             var titleOpacity = left == 0 ? 0d : 0.7d;
-            AniStart(
-                new[]
+            AnimationService.Run(
+                new List<IAnimation>
                 {
-                    AaOpacity(LabRamUsed, usedOpacity - LabRamUsed.Opacity, 100),
-                    AaOpacity(LabRamTotal, totalOpacity - LabRamTotal.Opacity, 100),
-                    AaOpacity(LabRamUsedTitle, titleOpacity - LabRamUsedTitle.Opacity, 100)
+                    new OpacityAnimation(LabRamUsed, usedOpacity - LabRamUsed.Opacity, 100),
+                    new OpacityAnimation(LabRamTotal, totalOpacity - LabRamTotal.Opacity, 100),
+                    new OpacityAnimation(
+                        LabRamUsedTitle,
+                        titleOpacity - LabRamUsedTitle.Opacity,
+                        100)
                 },
                 "SetupLaunch Ram TextLeft");
         }
@@ -407,27 +399,28 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
             : 2d + rectUsedWidth;
 
         if (ContainerAnimation.CanAnimate(this)
-            && (right != _ramTextRight || AniIsRun("SetupLaunch Ram TextRight")))
+            && (right != _ramTextRight
+                || AnimationService.IsAnimationRunning("SetupLaunch Ram TextRight")))
         {
-            AniStart(
-                new[]
+            AnimationService.Run(
+                new List<IAnimation>
                 {
-                    AaX(
+                    new XAnimation(
                         LabRamGame,
                         targetGameLeft - LabRamGame.Margin.Left,
                         100,
-                        ease: new AniEaseOutFluent(AniEasePower.Weak)),
-                    AaX(
+                        ease: new FluentEaseOut(EasePower.Weak)),
+                    new XAnimation(
                         LabRamGameTitle,
                         targetTitleLeft - LabRamGameTitle.Margin.Left,
                         100,
-                        ease: new AniEaseOutFluent(AniEasePower.Weak))
+                        ease: new FluentEaseOut(EasePower.Weak))
                 },
                 "SetupLaunch Ram TextRight");
         }
         else
         {
-            AniStop("SetupLaunch Ram TextRight");
+            AnimationService.CancelAnimationByName("SetupLaunch Ram TextRight");
             LabRamGame.Margin = new Thickness(targetGameLeft, 3d, 0d, 0d);
             LabRamGameTitle.Margin = new Thickness(targetTitleLeft, 0d, 0d, 5d);
         }
@@ -442,12 +435,11 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
     private void RefreshDisableJlwToolTip()
     {
         if (!_loaded) return;
-        ToolTip.SetTip(
-            CheckAdvanceDisableJLW,
-            Lang.Text(
-                SystemInfo.IsArm64System
-                    ? "Setup.Launch.Advanced.DisableJlw.Arm64Notice"
-                    : "Setup.Launch.Advanced.DisableJlw.ToolTip"));
+        CheckAdvanceDisableJLW.SetLocalizedValue(
+            ToolTip.TipProperty,
+            SystemInfo.IsArm64System
+                ? "Setup.Launch.Advanced.DisableJlw.Arm64Notice"
+                : "Setup.Launch.Advanced.DisableJlw.ToolTip");
         ToolTip.SetShowOnDisabled(CheckAdvanceDisableJLW, true);
     }
 
@@ -468,7 +460,7 @@ public partial class PageSetupLaunch : MyPageRight, ISetupResetPage
     {
         var instance = InstanceList.McMcInstanceSelected;
         if (instance is null) return;
-        PageRouter.Navigate(PageType.InstanceSetup, PageSubType.VersionSetup, instance);
+        PageRouter.Navigate(PageIds.InstanceSetup, SubPageIds.VersionSetup, instance);
     }
 
     #endregion

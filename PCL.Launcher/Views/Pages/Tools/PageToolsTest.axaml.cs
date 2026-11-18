@@ -6,6 +6,7 @@ using Avalonia.Media.Imaging;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.Logging;
+using PCL.Core.Platform;
 using PCL.Core.UI;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
@@ -19,9 +20,8 @@ using PCL.UI.Controls;
 namespace PCL.Views.Pages.Tools;
 
 /// <summary>
-///     测试工具页：常用工具（清理垃圾、今日人品、启动次数、创建快捷方式、手动崩溃）、
-///     自定义下载、正版玩家皮肤下载、服务器查询、自定义成就图片与皮肤头像生成器。
-///     自定义下载走统一的下载管线，皮肤与成就图片通过联网接口获取，头像在本地由皮肤贴图裁切生成。
+/// 测试工具页：常用工具（清理垃圾、今日人品、启动次数、创建快捷方式、手动崩溃）、 自定义下载、正版玩家皮肤下载、服务器查询、自定义成就图片与皮肤头像生成器。
+/// 自定义下载走统一的下载管线，皮肤与成就图片通过联网接口获取，头像在本地由皮肤贴图裁切生成。
 /// </summary>
 public partial class PageToolsTest : MyPageRight
 {
@@ -37,7 +37,10 @@ public partial class PageToolsTest : MyPageRight
         TextDownloadFolder.ValidateRules.Add(new FolderPathValidator());
         TextDownloadName.ValidateRules.Add(new FileNameValidator());
         TextAchievementItem.ValidateRules.Add(
-            new RegexValidator("^[a-z0-9_]+$", Lang.Text("Tools.Test.Achievement.InvalidId")));
+            new RegexValidator("^[a-z0-9_]+$")
+            {
+                ErrorKey = "Tools.Test.Achievement.InvalidId"
+            });
         TextAchievementTitle.ValidateRules.Add(new NullOrEmptyValidator());
         TextAchievementLine1.ValidateRules.Add(new NullOrEmptyValidator());
 
@@ -118,10 +121,7 @@ public partial class PageToolsTest : MyPageRight
         card.IsSwapped = true;
     }
 
-    /// <summary>
-    ///     WPF <c>PageToolsTest.RubbishClear</c> 的等价实现：运行中游戏、下载任务、清理确认、
-    ///     完整清理范围与重启行为都与原版一致。
-    /// </summary>
+    /// <summary>WPF <c>PageToolsTest.RubbishClear</c> 的等价实现：运行中游戏、下载任务、清理确认、 完整清理范围与重启行为都与原版一致。</summary>
     public static void ClearTrash()
     {
         LauncherCommon.RunInUi(() =>
@@ -131,7 +131,7 @@ public partial class PageToolsTest : MyPageRight
         });
 
         LauncherCommon.RunInNewThread(
-            () =>
+            async () =>
             {
                 try
                 {
@@ -153,16 +153,13 @@ public partial class PageToolsTest : MyPageRight
 
                     if (States.Hint.CleanJunkFile <= 2)
                     {
-                        if ((DialogService.Instance.Show(
-                                        new TextDialogRequest
-                                        {
-                                            Title = Lang.Text("Tools.Test.Clean.ConfirmTitle"),
-                                            Content = Lang.Text("Tools.Test.Clean.ConfirmMessage"),
-                                            Buttons = DialogButtons.OkCancel,
-                                            ForceWait = true
-                                        })
-                                    .Result?.Button
-                                ?? 0)
+                        if ((await DialogService.Instance.ShowAsync(
+                                new TextDialogRequest
+                                {
+                                    Title = Lang.Text("Tools.Test.Clean.ConfirmTitle"),
+                                    Content = Lang.Text("Tools.Test.Clean.ConfirmMessage"),
+                                    Buttons = DialogButtons.OkCancel
+                                })).Button
                             == 2)
                             return;
                         States.Hint.CleanJunkFile += 1;
@@ -205,18 +202,17 @@ public partial class PageToolsTest : MyPageRight
                     }
 
                     count += _DeleteDirectory(LauncherPaths.Temp);
-                    count += PCL.Core.Platform.PlatformRuntime.Current.ProcessCleanup
+                    count += PlatformRuntime.Current.ProcessCleanup
                         .CleanupAdditionalData();
 
                     if (count != 0)
                     {
-                        DialogService.Instance.Show(
+                        await DialogService.Instance.ShowAsync(
                             new TextDialogRequest
                             {
                                 Title = Lang.Text("Tools.Test.Clean.Cleared"),
                                 Content = Lang.Text("Tools.Test.Clean.ClearedMessage", count),
-                                Buttons = DialogButtons.Ok,
-                                ForceWait = true
+                                Buttons = DialogButtons.Ok
                             });
                         UiInteraction.Restart();
                     }
@@ -246,8 +242,8 @@ public partial class PageToolsTest : MyPageRight
     }
 
     /// <summary>
-    ///     删除目录并返回真正删除成功的文件数。与 WPF <c>Common.DeleteDirectory</c> 一样，
-    ///     只在单个文件删除成功后计数，删除失败的目录不计入清理数量。
+    /// 删除目录并返回真正删除成功的文件数。与 WPF <c>Common.DeleteDirectory</c> 一样，
+    /// 只在单个文件删除成功后计数，删除失败的目录不计入清理数量。
     /// </summary>
     private static int _DeleteDirectory(string path, bool ignoreIssue = true)
     {
@@ -342,12 +338,6 @@ public partial class PageToolsTest : MyPageRight
         return deletedCount;
     }
 
-    /// <summary>WPF 名称兼容入口。</summary>
-    public static void RubbishClear()
-    {
-        ClearTrash();
-    }
-
     /// <summary>WPF <c>PageToolsTest.Jrrp</c> 的等价实现。</summary>
     public static async void ShowDailyFortune()
     {
@@ -364,8 +354,7 @@ public partial class PageToolsTest : MyPageRight
                     {
                         Title = title,
                         Content = Lang.Text("Tools.Test.Luck.MessageGood", luckValue, rating),
-                        Buttons = DialogButtons.Ok,
-                        ForceWait = false
+                        Buttons = DialogButtons.Ok
                     });
             else
                 await DialogService.Instance.ShowAsync(
@@ -374,8 +363,7 @@ public partial class PageToolsTest : MyPageRight
                         Title = title,
                         Content = Lang.Text("Tools.Test.Luck.MessageBad", luckValue, rating),
                         Buttons = DialogButtons.Ok,
-                        IsWarn = luckValue <= 30,
-                        ForceWait = false
+                        IsWarn = luckValue <= 30
                     });
         }
         catch (Exception ex)
@@ -388,14 +376,7 @@ public partial class PageToolsTest : MyPageRight
         }
     }
 
-    /// <summary>WPF 名称兼容入口。</summary>
-    public static void Jrrp()
-    {
-        ShowDailyFortune();
-    }
-
-    /// <summary>WPF <c>GenerateDailySeed</c> 的等价实现：日期 + 启动器识别码的 DJB2 哈希。</summary>
-    public static int GenerateDailySeed()
+    private static int GenerateDailySeed()
     {
         var datePart = DateTime.Today.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
         return _Djb2Hash(datePart + Identify.LauncherId);
@@ -411,8 +392,7 @@ public partial class PageToolsTest : MyPageRight
         return (int)(hash & 0x7FFFFFFFL);
     }
 
-    /// <summary>WPF <c>GetRating</c> 的等价实现。</summary>
-    public static string GetRating(int luckValue)
+    private static string GetRating(int luckValue)
     {
         var key = luckValue switch
         {
@@ -429,8 +409,7 @@ public partial class PageToolsTest : MyPageRight
         return Lang.Text(key);
     }
 
-    /// <summary>WPF <c>PageToolsTest.StartCustomDownload</c> 的等价实现。</summary>
-    public static void StartCustomDownload(
+    public static async Task StartCustomDownloadAsync(
         string url,
         string? fileName,
         string? folder,
@@ -443,7 +422,7 @@ public partial class PageToolsTest : MyPageRight
                 : fileName;
             if (string.IsNullOrWhiteSpace(folder))
             {
-                folder = SystemDialogs.SelectSaveFile(
+                folder = await SystemDialogs.SelectSaveFileAsync(
                     Lang.Text("Tools.Test.CustomDownload.SelectLocation"),
                     fileName);
                 if (string.IsNullOrEmpty(folder)) return;
@@ -461,7 +440,7 @@ public partial class PageToolsTest : MyPageRight
             var uuid = LauncherCommon.GetUuid();
             var savePath = Path.Combine(folder, fileName);
             Loading.LoaderBase loader;
-            if (new HttpValidator().Validate(url).IsValid)
+            if ((await new HttpValidator().ValidateAsync(url)).IsValid)
                 loader = new LoaderDownload(
                     Lang.Text("Tools.Test.CustomDownload.LoaderName", fileName),
                     [new DownloadFile([url], savePath, null, true, userAgent)]);
@@ -508,7 +487,7 @@ public partial class PageToolsTest : MyPageRight
             };
             combo.Start();
             Loading.LoaderTaskbarAdd(combo);
-            UiInteraction.RefreshDownloadButton(nameof(StartCustomDownload));
+            UiInteraction.RefreshDownloadButton(nameof(StartCustomDownloadAsync));
         }
         catch (Exception ex)
         {

@@ -1,20 +1,21 @@
-using System.Diagnostics;
-using System.Text;
 using Avalonia.Controls;
+using Avalonia.Data;
 using PCL.Core.App;
 using PCL.Core.App.Configuration;
 using PCL.Core.App.Localization;
+using PCL.Core.Platform;
 using PCL.Core.UI;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
+using PCL.Navigation;
 using PCL.UI;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Setup;
 
 /// <summary>
-///     启动器杂项设置页：公告显示、日志上限、网络代理与调试选项。
-///     配置状态由 <see cref="PageSetupLauncherMiscViewModel" /> 持有，页面处理系统级文件操作与重启。
+/// 启动器杂项设置页：公告显示、日志上限、网络代理与调试选项。 配置状态由 <see cref="PageSetupLauncherMiscViewModel" />
+/// 持有，页面处理系统级文件操作与重启。
 /// </summary>
 public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
 {
@@ -29,6 +30,18 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
 
         SliderMaxLog.getHintText = new Func<object, object>(FormatMaxLogHint);
         SliderDebugAnim.getHintText = new Func<object, object>(FormatAnimationSpeedHint);
+        ComboDebugLinuxProtocolAuto.Bind(
+            ContentControl.ContentProperty,
+            new Binding(nameof(ViewModel.LinuxProtocolAutoText))
+            {
+                Source = ViewModel
+            });
+        ComboDebugLinuxProtocolAuto.Bind(
+            ToolTip.TipProperty,
+            new Binding(nameof(ViewModel.LinuxProtocolAutoToolTip))
+            {
+                Source = ViewModel
+            });
 
         ComboSystemActivity.SelectionChanged += async (_, _) => await OnAnnouncementChangedAsync();
         SliderMaxLog.Change += (_, _) =>
@@ -36,15 +49,14 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
         SliderDebugAnim.Change += (_, _) =>
             WriteIfReady(() => Config.Debug.AnimationSpeed = SliderDebugAnim.Value);
 
-        var supportsProtocol = PCL.Core.Platform.PlatformRuntime.Current.Capabilities
+        var supportsProtocol = PlatformRuntime.Current.Capabilities
             .SupportsDisplayProtocolSelection;
         ComboDebugLinuxProtocol.IsEnabled = supportsProtocol;
-        ToolTip.SetTip(
-            ComboDebugLinuxProtocol,
-            Lang.Text(
-                supportsProtocol
-                    ? "Setup.Misc.Debug.LinuxProtocol.ToolTip"
-                    : "Setup.Misc.Debug.LinuxProtocol.OnlyLinux"));
+        ComboDebugLinuxProtocol.SetLocalizedValue(
+            ToolTip.TipProperty,
+            supportsProtocol
+                ? "Setup.Misc.Debug.LinuxProtocol.ToolTip"
+                : "Setup.Misc.Debug.LinuxProtocol.OnlyLinux");
         ToolTip.SetShowOnDisabled(ComboDebugLinuxProtocol, true);
         ComboDebugLinuxProtocol.SelectionChanged += (_, _) =>
         {
@@ -122,7 +134,7 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
         Reload();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack.ScrollToHome();
         if (_loaded) Reload();
@@ -130,13 +142,6 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
 
     public override void OnNavigatedFrom()
     {
-    }
-
-    protected override void RefreshLocalization()
-    {
-        if (!_loaded) return;
-        Reload();
-        RefreshTelemetryToolTip();
     }
 
     public void Reload()
@@ -181,16 +186,16 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
     {
         if (ViewModel.IsBuildUntrusted)
         {
-            ToolTip.SetTip(
-                CheckSystemTelemetry,
-                Lang.Text("Setup.Misc.System.Telemetry.Unavailable"));
+            CheckSystemTelemetry.SetLocalizedValue(
+                ToolTip.TipProperty,
+                "Setup.Misc.System.Telemetry.Unavailable");
             ToolTip.SetShowOnDisabled(CheckSystemTelemetry, true);
         }
         else
         {
-            ToolTip.SetTip(
-                CheckSystemTelemetry,
-                Lang.Text("Setup.Misc.System.Telemetry.ToolTip"));
+            CheckSystemTelemetry.SetLocalizedValue(
+                ToolTip.TipProperty,
+                "Setup.Misc.System.Telemetry.ToolTip");
             ToolTip.SetShowOnDisabled(CheckSystemTelemetry, false);
         }
     }
@@ -252,9 +257,9 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
         ViewModel.ActivityIndex = index;
     }
 
-    private static void ExportSettings()
+    private static async void ExportSettings()
     {
-        var savePath = SystemDialogs.SelectSaveFile(
+        var savePath = await SystemDialogs.SelectSaveFileAsync(
             Lang.Text("Setup.Misc.System.ExportSettings.SaveTitle"),
             "PCL 全局配置.json",
             Lang.Text("Setup.Misc.System.ExportSettings.Filter"),
@@ -267,7 +272,7 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
 
     private static async Task ImportSettingsAsync()
     {
-        var sourcePath = SystemDialogs.SelectFile(
+        var sourcePath = await SystemDialogs.SelectFileAsync(
             Lang.Text("Setup.Misc.System.ExportSettings.Filter"),
             Lang.Text("Setup.Misc.System.ImportSettings.SelectTitle"));
         if (string.IsNullOrWhiteSpace(sourcePath)) return;
@@ -281,8 +286,7 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
                     Content = Lang.Text("Setup.Misc.System.ImportSettings.Success.Message"),
                     Buttons = DialogButtons.From(
                         DialogButton.Create(
-                            Lang.Text("Setup.Misc.System.ImportSettings.Success.Restart"))),
-                    ForceWait = true
+                            Lang.Text("Setup.Misc.System.ImportSettings.Success.Restart")))
                 });
             // 导入的配置需要重启后生效；与 WPF 一样立即重启启动器。
             UiInteraction.Restart();
@@ -387,7 +391,7 @@ public partial class PageSetupLauncherMisc : MyPageRight, ISetupResetPage
             .Distinct()
             .ToArray();
 
-        PCL.Core.Platform.PlatformRuntime.Current.ProcessCleanup.DeleteFoldersAndRestart(folders);
+        PlatformRuntime.Current.ProcessCleanup.DeleteFoldersAndRestart(folders);
 
         UiInteraction.Shutdown();
         return;

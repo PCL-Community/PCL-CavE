@@ -5,13 +5,12 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using PCL.UI.Controls;
-using static PCL.Animations;
 
 namespace PCL.Views.Pages.Instance;
 
 /// <summary>
-///     实例资源列表项，对齐 WPF <c>MyLocalCompItem</c>：
-///     44px 单行、34px 图标与状态角标、可压缩的标题/副标题、标签、更新按钮、悬停操作按钮。
+/// 实例资源列表项，对齐 WPF <c>MyLocalCompItem</c>： 44px 单行、34px
+/// 图标与状态角标、可压缩的标题/副标题、标签、更新按钮、悬停操作按钮。
 /// </summary>
 public partial class MyLocalModItem : Grid
 {
@@ -57,6 +56,11 @@ public partial class MyLocalModItem : Grid
 
         Cursor = new Cursor(StandardCursorType.Hand);
         ViewModel.Initialize(entry, new ItemHost(this));
+        ViewModel.PropertyChanged += (_, args) =>
+        {
+            if (string.IsNullOrEmpty(args.PropertyName))
+                ApplyViewModel();
+        };
 
         BtnUpdate.Click += (_, _) => ViewModel.UpdateCommand.Execute(null);
         BtnUpdate.PointerPressed += (_, e) =>
@@ -315,51 +319,51 @@ public partial class MyLocalModItem : Grid
             return;
         }
 
-        var animations = new List<AniData>();
+        var animations = new List<IAnimation>();
         AddButtonAnimations(animations, showButtons, time);
         var scale = EnsureBackScale();
 
         if (stateNew is "MouseOver" or "MouseDown" or "Checked")
         {
             animations.Add(
-                AaColor(
+                new ColorAnimation(
                     RectBack,
                     Border.BackgroundProperty,
                     stateNew == "MouseDown" ? "ColorBrush6" : "ColorBrushBg1",
                     time));
             animations.Add(
-                AaOpacity(
+                new OpacityAnimation(
                     RectBack,
                     1d - RectBack.Opacity,
                     time,
-                    ease: new AniEaseOutFluent()));
+                    ease: new FluentEaseOut()));
             animations.Add(
-                AaScaleTransform(
+                new ScaleTransformAnimation(
                     RectBack,
                     (stateNew == "MouseDown" ? 0.996d : 1d) - scale.ScaleX,
                     (int)Math.Round(time * 1.2d),
-                    ease: new AniEaseOutFluent()));
+                    ease: new FluentEaseOut()));
         }
         else
         {
-            animations.Add(AaOpacity(RectBack, -RectBack.Opacity, time));
+            animations.Add(new OpacityAnimation(RectBack, -RectBack.Opacity, time));
             animations.Add(
-                AaColor(RectBack, Border.BackgroundProperty, "ColorBrush7", time));
+                new ColorAnimation(RectBack, Border.BackgroundProperty, "ColorBrush7", time));
             animations.Add(
-                AaScaleTransform(
+                new ScaleTransformAnimation(
                     RectBack,
                     0.996d - scale.ScaleX,
                     time,
-                    ease: new AniEaseOutFluent()));
-            animations.Add(AaScaleTransform(RectBack, -0.196d, 1, after: true));
+                    ease: new FluentEaseOut()));
+            animations.Add(new ScaleTransformAnimation(RectBack, -0.196d, 1, after: true));
         }
 
-        AniStart(animations, $"LocalModItem Color {_uuid}");
+        AnimationService.Run(animations, $"LocalModItem Color {_uuid}");
     }
 
     private void ApplyColorStateInstant(string stateNew, bool showButtons)
     {
-        AniStop($"LocalModItem Color {_uuid}");
+        AnimationService.CancelAnimationByName($"LocalModItem Color {_uuid}");
         if (_buttonStack is not null)
         {
             _buttonStack.Opacity = showButtons ? 1d : 0d;
@@ -390,7 +394,7 @@ public partial class MyLocalModItem : Grid
         scale.ScaleY = scaleValue;
     }
 
-    private void AddButtonAnimations(List<AniData> animations, bool showButtons, int time)
+    private void AddButtonAnimations(List<IAnimation> animations, bool showButtons, int time)
     {
         if (_buttonStack is null)
             return;
@@ -401,13 +405,13 @@ public partial class MyLocalModItem : Grid
             _buttonStack.RenderTransform = _buttonTransform;
 
         animations.Add(
-            AaOpacity(
+            new OpacityAnimation(
                 _buttonStack,
                 (showButtons ? 1d : 0d) - _buttonStack.Opacity,
                 (int)Math.Round(time * (showButtons ? 0.7d : 0.4d)),
                 showButtons ? (int)Math.Round(time * 0.3d) : 0));
         animations.Add(
-            AaTranslateX(
+            new TranslateXAnimation(
                 _buttonStack,
                 (showButtons ? 0d : 4d) - _buttonTransform.X,
                 (int)Math.Round(time * (showButtons ? 0.3d : 0.4d)),
@@ -426,7 +430,7 @@ public partial class MyLocalModItem : Grid
 
         if (!animate || !ContainerAnimation.CanAnimate(this))
         {
-            AniStop($"MyLocalModItem Checked {_uuid}");
+            AnimationService.CancelAnimationByName($"MyLocalModItem Checked {_uuid}");
             RectCheck.VerticalAlignment = VerticalAlignment.Center;
             RectCheck.Margin = new Thickness(-3d, 0d, 0d, 0d);
             RectCheck.Height = _checked ? 32d : 0d;
@@ -436,42 +440,44 @@ public partial class MyLocalModItem : Grid
             return;
         }
 
-        var animations = new List<AniData>();
+        var animations = new List<IAnimation>();
         if (_checked)
         {
             var delta = 32d - RectCheck.Height;
             RectCheck.VerticalAlignment = VerticalAlignment.Center;
             RectCheck.Margin = new Thickness(-3d, 0d, 0d, 0d);
             animations.Add(
-                AaHeight(
+                new HeightAnimation(
                     RectCheck,
                     delta * 0.4d,
                     200,
-                    ease: new AniEaseOutFluent(AniEasePower.Weak)));
+                    ease: new FluentEaseOut(EasePower.Weak)));
             animations.Add(
-                AaHeight(
+                new HeightAnimation(
                     RectCheck,
                     delta * 0.6d,
                     300,
-                    ease: new AniEaseOutBack(AniEasePower.Weak)));
-            animations.Add(AaOpacity(RectCheck, 1d - RectCheck.Opacity, 30));
-            animations.Add(AaColor(LabTitle, TextBlock.ForegroundProperty, titleKey, 200));
+                    ease: new BackEaseWithPowerOut(EasePower.Weak)));
+            animations.Add(new OpacityAnimation(RectCheck, 1d - RectCheck.Opacity, 30));
+            animations.Add(
+                new ColorAnimation(LabTitle, TextBlock.ForegroundProperty, titleKey, 200));
         }
         else
         {
             animations.Add(
-                AaHeight(
+                new HeightAnimation(
                     RectCheck,
                     -RectCheck.Height,
                     120,
-                    ease: new AniEaseInFluent(AniEasePower.Weak)));
-            animations.Add(AaOpacity(RectCheck, -RectCheck.Opacity, 70, 40));
-            animations.Add(AaColor(LabTitle, TextBlock.ForegroundProperty, titleKey, 120));
-            animations.Add(AaCode(() => RectCheck.Height = 0d, after: true));
+                    ease: new FluentEaseIn(EasePower.Weak)));
+            animations.Add(new OpacityAnimation(RectCheck, -RectCheck.Opacity, 70, 40));
+            animations.Add(
+                new ColorAnimation(LabTitle, TextBlock.ForegroundProperty, titleKey, 120));
+            animations.Add(new ActionAnimation(() => RectCheck.Height = 0d, true));
         }
 
         RefreshColors();
-        AniStart(animations, $"MyLocalModItem Checked {_uuid}");
+        AnimationService.Run(animations, $"MyLocalModItem Checked {_uuid}");
     }
 
     private ScaleTransform EnsureBackScale()

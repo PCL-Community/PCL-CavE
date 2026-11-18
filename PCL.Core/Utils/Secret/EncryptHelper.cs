@@ -178,9 +178,9 @@ public static class EncryptHelper
     private static byte[]? _cachedKey;
 
     /// <summary>
-    ///     用户密钥。只在成功获取后缓存——失败不会被记住，下次访问会重新尝试。<br />
-    ///     注意：密钥文件的 version（1 = 旧版 CAPI DPAPI，2 = CNG DPAPI，3 = 非 Windows 平台机器绑定 AES-GCM）与
-    ///     <see cref="SecretEncrypt" /> 的数据算法 version（0/1/2）语义无关。
+    /// 用户密钥。只在成功获取后缓存——失败不会被记住，下次访问会重新尝试。<br /> 注意：密钥文件的 version（1 = 旧版 CAPI DPAPI，2 =
+    /// CNG DPAPI，3 = 非 Windows 平台机器绑定 AES-GCM）与 <see cref="SecretEncrypt" /> 的数据算法
+    /// version（0/1/2）语义无关。
     /// </summary>
     internal static byte[] EncryptionKey
     {
@@ -255,7 +255,7 @@ public static class EncryptHelper
         RandomNumberGenerator.Fill(key);
         if (!KeyProtector.TryProtect(key, out var storeData))
             throw new InvalidOperationException(
-                PlatformRuntime.Current.Capabilities.UsesWindowsPaths
+                OperatingSystem.IsWindows()
                     ? "本机 DPAPI 不可用，无法创建用户密钥"
                     : "本机密钥保护不可用，无法创建用户密钥");
         _QuarantineBrokenKeyFile(keyFile); // 已确认能重建，才动原文件
@@ -284,7 +284,7 @@ public static class EncryptHelper
                 fs.Flush(true);
             }
 
-            if (!PlatformRuntime.Current.Capabilities.UsesWindowsPaths)
+            if (!OperatingSystem.IsWindows())
                 try
                 {
                     File.SetUnixFileMode(tmpFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);

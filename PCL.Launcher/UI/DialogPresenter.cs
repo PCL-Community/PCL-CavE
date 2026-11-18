@@ -8,16 +8,13 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
 using PCL.Core.UI.Dialogs;
-using PCL.UI.Animations;
 using PCL.UI.Dialogs;
-using MyColor = PCL.UI.Controls.Common.MyColor;
 
 namespace PCL.UI;
 
 /// <summary>
-///     把 Core 的弹窗状态按类型渲染为对应弹窗控件，并在主窗口的遮罩层中呈现：
-///     遮罩与弹窗一起淡入，关闭时先淡出再移除视图并释放遮罩。
-///     主窗口或遮罩层尚未就绪时退回独立窗口，界面完全不可用时退回无主窗口的独立窗口。
+/// 把 Core 的弹窗状态按类型渲染为对应弹窗控件，并在主窗口的遮罩层中呈现： 遮罩与弹窗一起淡入，关闭时先淡出再移除视图并释放遮罩。
+/// 主窗口或遮罩层尚未就绪时退回独立窗口，界面完全不可用时退回无主窗口的独立窗口。
 /// </summary>
 public sealed class DialogPresenter : IDialogPresenter
 {
@@ -53,15 +50,13 @@ public sealed class DialogPresenter : IDialogPresenter
 
     private Window? _window;
 
-    public static DialogPresenter Instance { get; } = new();
-
     /// <summary>当前是否有弹窗正在显示或淡出。</summary>
     public bool HasOpenDialog =>
         _dialogs.Count > 0 || _windows.Count > 0 || _closing is not null || _releasing;
 
     /// <summary>
-    ///     主窗口可见、未被最小化，且没有弹窗正在显示或淡出时才可呈现；
-    ///     否则返回 <see langword="false" />，由 <see cref="DialogService" /> 排队重试或退回兜底。
+    /// 主窗口可见、未被最小化，且没有弹窗正在显示或淡出时才可呈现； 否则返回 <see langword="false" />，由
+    /// <see cref="DialogService" /> 排队重试或退回兜底。
     /// </summary>
     public bool IsAvailable
     {
@@ -154,11 +149,6 @@ public sealed class DialogPresenter : IDialogPresenter
             ReleaseWindow(window, dialog);
             dialog.Close(DialogResult.None);
         }
-    }
-
-    public static void Install()
-    {
-        DialogService.Instance.Presenter = Instance;
     }
 
     /// <summary>绑定主窗口及其遮罩层，由主窗口构造时调用；容器按名称在窗口内查找。</summary>
@@ -364,7 +354,7 @@ public sealed class DialogPresenter : IDialogPresenter
         if (DialogService.Instance.HasPending)
             return;
 
-        PCL.Animations.AniStop(MaskAnimationKey);
+        AnimationService.CancelAnimationByName(MaskAnimationKey);
         _SetMaskColor(0, 0, 0, 0);
         layer.IsVisible = false;
         layer.Opacity = 1d;
@@ -383,7 +373,7 @@ public sealed class DialogPresenter : IDialogPresenter
         _releasing = false;
         if (_layer is not { } layer) return;
 
-        PCL.Animations.AniStop(MaskAnimationKey);
+        AnimationService.CancelAnimationByName(MaskAnimationKey);
         _SetMaskColor(0, 0, 0, 0);
         layer.IsVisible = false;
         layer.Opacity = 1d;
@@ -402,7 +392,7 @@ public sealed class DialogPresenter : IDialogPresenter
         // 挂载失败的弹窗可能已经把遮罩显示出来，容器空了就一并复位，避免遮罩一直挡住界面
         if (_dialogs.Count > 0 || _layer is not { } layer) return;
 
-        PCL.Animations.AniStop(MaskAnimationKey);
+        AnimationService.CancelAnimationByName(MaskAnimationKey);
         _SetMaskColor(0, 0, 0, 0);
         layer.IsVisible = false;
         layer.Opacity = 1d;
@@ -459,37 +449,43 @@ public sealed class DialogPresenter : IDialogPresenter
     {
         if (_mask is not { } mask) return;
 
-        PCL.Animations.AniStop(MaskAnimationKey);
+        AnimationService.CancelAnimationByName(MaskAnimationKey);
         var target = show
-            ? warn ? new MyColor(140d, 80d, 0d, 0d) : new MyColor(90d, 0d, 0d, 0d)
-            : new MyColor(0d, 0d, 0d, 0d);
+            ? warn
+                ? new NColor(80d, 0d, 0d, 140d)
+                : new NColor(0d, 0d, 0d, 90d)
+            : new NColor(0d, 0d, 0d, 0d);
         var duration = _GetFadeDuration(200);
 
         if (duration <= 0 || !_CanAnimate(mask))
         {
             _SetMaskColor(
-                (byte)Math.Round(target.a),
-                (byte)Math.Round(target.r),
-                (byte)Math.Round(target.g),
-                (byte)Math.Round(target.b));
+                (byte)Math.Round(target.A),
+                (byte)Math.Round(target.R),
+                (byte)Math.Round(target.G),
+                (byte)Math.Round(target.B));
             return;
         }
 
-        var current = new MyColor(mask.Background);
-        PCL.Animations.AniStart(
-            new List<PCL.Animations.AniData>
+        var current = new NColor(mask.Background);
+        AnimationService.Run(
+            new List<IAnimation>
             {
-                PCL.Animations.AaColor(
+                new ColorAnimation(
                     mask,
                     Border.BackgroundProperty,
                     target - current,
                     duration,
-                    ease: new PCL.Animations.AniEaseOutFluent())
+                    ease: new FluentEaseOut())
             },
             MaskAnimationKey);
     }
 
-    private void _SetMaskColor(byte a, byte r, byte g, byte b)
+    private void _SetMaskColor(
+        byte a,
+        byte r,
+        byte g,
+        byte b)
     {
         if (_mask is { } mask)
             mask.Background = new SolidColorBrush(Color.FromArgb(a, r, g, b));
@@ -514,7 +510,7 @@ public sealed class DialogPresenter : IDialogPresenter
         // 主窗口关闭后遮罩再没有落点：结束淡出动画，弹窗按取消收尾，避免调用方一直等待结果
         _StopReleaseTimer();
         _StopExitTimers();
-        PCL.Animations.AniStop(MaskAnimationKey);
+        AnimationService.CancelAnimationByName(MaskAnimationKey);
 
         var dialogs = _dialogs.ToArray();
         _dialogs.Clear();

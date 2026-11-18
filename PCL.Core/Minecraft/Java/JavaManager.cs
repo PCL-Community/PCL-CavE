@@ -8,14 +8,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using PCL.Core.App;
 using PCL.Core.Logging;
-using PCL.Core.Minecraft.Java;
 using PCL.Core.Minecraft.Java.Parser;
 using PCL.Core.Minecraft.Java.Scanner;
 using PCL.Core.Platform;
 using PCL.Core.Utils;
 using PCL.Core.Utils.Exts;
 
-namespace PCL.Core.Minecraft;
+namespace PCL.Core.Minecraft.Java;
 
 public class JavaManager(
     IJavaParser parser,
@@ -62,19 +61,15 @@ public class JavaManager(
             foreach (var item in items)
             {
                 var parserResult = _ParseInstallation(item.Path);
-                if (parserResult is null)
-                {
-                    LogWrapper.Trace(ModuleName, $"Can not find Java {item.Path}, skip");
-                    continue;
-                }
-
-                itemsAdded.Add(
+                parserResult.IfSuccess(installation => itemsAdded.Add(
                     new JavaEntry
                     {
-                        Installation = parserResult,
+                        Installation = installation,
                         IsEnabled = item.IsEnable,
                         Source = item.Source ?? JavaSource.AutoScanned
-                    });
+                    }));
+                parserResult.IfFailure(_ =>
+                    LogWrapper.Trace(ModuleName, $"Can not find Java {item.Path}, skip"));
             }
 
             lock (_javaEntries)
@@ -99,9 +94,7 @@ public class JavaManager(
         }
     }
 
-    /// <summary>
-    ///     扫描 Java 安装
-    /// </summary>
+    /// <summary>扫描 Java 安装</summary>
     public async Task ScanJavaAsync(bool force = false)
     {
         if (ShouldSkip()) return;
@@ -150,21 +143,22 @@ public class JavaManager(
             existingEntries = new Dictionary<string, JavaEntry>(_javaEntries);
         }
 
-        var scannedEntries = pathSet
-            .Keys
-            .Select(_ParseInstallation)
-            .Where(inst => inst is not null)
-            .Select(inst => new JavaEntry
-            {
-                Installation = inst!,
-                IsEnabled = existingEntries.TryGetValue(
-                    _NormalizePath(inst!.JavaExePath),
-                    out var existingJava)
-                    ? existingJava.IsEnabled
-                    : _ShouldEnableByDefault(inst!),
-                Source = JavaSource.AutoScanned
-            })
-            .ToList();
+        var scannedEntries = new List<JavaEntry>();
+        foreach (var parserResult in pathSet.Keys.Select(_ParseInstallation))
+        {
+            parserResult.IfSuccess(installation => scannedEntries.Add(
+                new JavaEntry
+                {
+                    Installation = installation,
+                    IsEnabled = existingEntries.TryGetValue(
+                        _NormalizePath(installation.JavaExePath),
+                        out var existingJava)
+                        ? existingJava.IsEnabled
+                        : _ShouldEnableByDefault(installation),
+                    Source = JavaSource.AutoScanned
+                }));
+            parserResult.IfFailure(error => LogWrapper.Warn(error, "Unable to parse Java file"));
+        }
 
         lock (_javaEntries)
         {
@@ -173,20 +167,19 @@ public class JavaManager(
         }
     }
 
-    private JavaInstallation? _ParseInstallation(string javaExePath)
+    private Result<JavaInstallation, Exception> _ParseInstallation(string javaExePath)
     {
-        var installation = parser.Parse(javaExePath);
-        return installation is null
-            ? null
-            : installation with
+        return parser
+            .Parse(javaExePath)
+            .Map(installation => installation with
             {
                 JavaFolder = _ResolveDirectoryPath(installation.JavaFolder)
-            };
+            });
     }
 
     private static bool _ShouldEnableByDefault(JavaInstallation inst)
     {
-        if (!PlatformRuntime.Current.Capabilities.SupportsJavaw)
+        if (!PlatformRuntime.Current.Java.SupportsJavaw)
             return !(inst.Is64Bit ^ Environment.Is64BitOperatingSystem || !inst.IsStillAvailable);
 
         var libDir = Path.Combine(Directory.GetParent(inst.JavaFolder)!.FullName, "lib");
@@ -229,9 +222,7 @@ public class JavaManager(
         return _javaEntries.ContainsKey(javaExePath);
     }
 
-    /// <summary>
-    ///     获取，如果没有就加入记录
-    /// </summary>
+    /// <summary>获取，如果没有就加入记录</summary>
     /// <param name="javaExePath"></param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
@@ -241,25 +232,28 @@ public class JavaManager(
         {
             if (javaExePath.IsNullOrWhiteSpace() || !File.Exists(javaExePath)) return null;
 
-            var installation = _ParseInstallation(javaExePath);
-            if (installation is null) return null;
+            return _ParseInstallation(javaExePath)
+                .Match<JavaEntry?>(
+                    installation =>
+                    {
+                        var exePath = _NormalizePath(installation.JavaExePath);
+                        lock (_javaEntries)
+                        {
+                            if (_javaEntries.TryGetValue(exePath, out var ret))
+                                return ret;
 
-            var exePath = _NormalizePath(installation.JavaExePath);
-            lock (_javaEntries)
-            {
-                if (_javaEntries.TryGetValue(exePath, out var ret))
-                    return ret;
+                            var entry = new JavaEntry
+                            {
+                                Installation = installation,
+                                IsEnabled = _ShouldEnableByDefault(installation),
+                                Source = JavaSource.ManualAdded
+                            };
 
-                var entry = new JavaEntry
-                {
-                    Installation = installation,
-                    IsEnabled = _ShouldEnableByDefault(installation),
-                    Source = JavaSource.ManualAdded
-                };
-
-                _javaEntries.Add(exePath, entry);
-                return entry;
-            }
+                            _javaEntries.Add(exePath, entry);
+                            return entry;
+                        }
+                    },
+                    _ => null);
         }
         catch (Exception ex)
         {
@@ -268,33 +262,32 @@ public class JavaManager(
         }
     }
 
-    /// <summary>
-    ///     仅获取，如果没有不增加记录
-    /// </summary>
+    /// <summary>仅获取，如果没有不增加记录</summary>
     public JavaEntry? Get(string javaExePath)
     {
         try
         {
             if (javaExePath.IsNullOrWhiteSpace() || !File.Exists(javaExePath)) return null;
 
-            var installation = _ParseInstallation(javaExePath);
-            if (installation is null) return null;
+            return _ParseInstallation(javaExePath)
+                .Match<JavaEntry?>(
+                    installation =>
+                    {
+                        var exePath = _NormalizePath(installation.JavaExePath);
+                        lock (_javaEntries)
+                        {
+                            if (_javaEntries.TryGetValue(exePath, out var ret))
+                                return ret;
 
-            var exePath = _NormalizePath(installation.JavaExePath);
-            lock (_javaEntries)
-            {
-                if (_javaEntries.TryGetValue(exePath, out var ret))
-                    return ret;
-
-                var entry = new JavaEntry
-                {
-                    Installation = installation,
-                    IsEnabled = _ShouldEnableByDefault(installation),
-                    Source = JavaSource.ManualAdded
-                };
-
-                return entry;
-            }
+                            return new JavaEntry
+                            {
+                                Installation = installation,
+                                IsEnabled = _ShouldEnableByDefault(installation),
+                                Source = JavaSource.ManualAdded
+                            };
+                        }
+                    },
+                    _ => null);
         }
         catch (Exception ex)
         {
@@ -347,9 +340,7 @@ public class JavaManager(
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 
-    /// <summary>
-    ///     逐级解析路径中的目录软链，使 /usr/lib/jvm/jre-25-openjdk 这类目录软链与真实目录归一到同一个 JavaFolder。
-    /// </summary>
+    /// <summary>逐级解析路径中的目录软链，使 /usr/lib/jvm/jre-25-openjdk 这类目录软链与真实目录归一到同一个 JavaFolder。</summary>
     private static string _ResolveDirectoryPath(string directory)
     {
         var fullPath = Path.GetFullPath(directory);
@@ -386,9 +377,7 @@ public class JavaManager(
     }
 
 
-    /// <summary>
-    ///     将 Java 版本规范化为统一比较格式（1.8.0 → 8.0.0）
-    /// </summary>
+    /// <summary>将 Java 版本规范化为统一比较格式（1.8.0 → 8.0.0）</summary>
     public static Version NormalizeVersion(Version version)
     {
         return version is { Major: 1, Minor: >= 0 }
@@ -398,9 +387,7 @@ public class JavaManager(
 
     // ===== 版本处理工具 =====
 
-    /// <summary>
-    ///     检查版本是否在指定范围内（闭区间）
-    /// </summary>
+    /// <summary>检查版本是否在指定范围内（闭区间）</summary>
     public static bool IsVersionSuitable(
         Version javaVersion,
         Version minVersion,

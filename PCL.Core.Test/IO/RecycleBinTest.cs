@@ -1,15 +1,21 @@
 using System;
 using System.IO;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using PCL.Core.Platform;
-using PCL.Core.UI;
+using PCL.Platform;
 
 namespace PCL.Core.Test.IO;
 
 [TestClass]
+[OSCondition(OperatingSystems.Linux)]
 public class RecycleBinTest
 {
-    private readonly IRecycleBinService _bin = PlatformModuleFactory.Create().RecycleBin;
+    private readonly IRecycleBinService _bin = new ServiceCollection()
+        .AddPlatformServices(PlatformDetector.Detect())
+        .BuildServiceProvider()
+        .GetRequiredService<IRecycleBinService>();
+
     private string? _originalDataHome;
     private string _sandboxRoot = string.Empty;
     private string _trashRoot = string.Empty;
@@ -20,7 +26,7 @@ public class RecycleBinTest
         _originalDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
         _sandboxRoot = Path.Combine(
             AppContext.BaseDirectory,
-            "recycle-bin-test-" + Guid.NewGuid().ToString("N")[..8]);
+            $"recycle-bin-test-{Guid.NewGuid().ToString("N")[..8]}");
         _trashRoot = Path.Combine(_sandboxRoot, "xdg-data");
         Directory.CreateDirectory(_sandboxRoot);
         Environment.SetEnvironmentVariable("XDG_DATA_HOME", _trashRoot);

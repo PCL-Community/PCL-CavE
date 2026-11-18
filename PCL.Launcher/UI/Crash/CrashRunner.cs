@@ -10,10 +10,6 @@ using PCL.UI;
 
 namespace PCL;
 
-/// <summary>
-///     崩溃分析的一次执行：收集日志、整理、检测原因，并把结果交给弹窗呈现。
-///     内核（收集/整理/检测）位于 PCL.Launcher.Core，本类只负责流程编排与界面呈现。
-/// </summary>
 internal sealed class CrashRunner
 {
     private readonly CrashLogCollector _collector;
@@ -68,19 +64,25 @@ internal sealed class CrashRunner
         _context.LogAll = logs.All;
     }
 
-    public void Output(bool isHandAnalyze, List<string>? extraFiles)
+    public async void Output(bool isHandAnalyze, List<string>? extraFiles)
     {
-        CrashPresenter.Output(_context, isHandAnalyze, extraFiles);
+        try
+        {
+            await CrashPresenter.OutputAsync(_context, isHandAnalyze, extraFiles);
+        }
+        catch (Exception ex)
+        {
+            LogWrapper.Error(ex, "Crash", "展示崩溃报告失败");
+        }
     }
 }
 
-/// <summary>崩溃结果的弹窗呈现与报告导出。</summary>
 internal static class CrashPresenter
 {
     private static readonly CrashResultFormatter Formatter = new();
     private static readonly CrashReportExporter Exporter = new();
 
-    public static void Output(
+    public static async Task OutputAsync(
         CrashAnalysisContext context,
         bool isHandAnalyze,
         List<string>? extraFiles)
@@ -100,7 +102,7 @@ internal static class CrashPresenter
             ? ""
             : Lang.Text("Crash.Dialog.Button.ExportReport");
 
-        var selectedButton = UiInteraction.Message(
+        var selectedButton = await UiInteraction.MessageAsync(
             crashContent.Text,
             title,
             Lang.Text("Common.Action.Confirm"),
@@ -116,7 +118,7 @@ internal static class CrashPresenter
                     OpenDirectFile(directFile);
                 break;
             case 3:
-                ExportReport(context, extraFiles);
+                await ExportReportAsync(context, extraFiles);
                 break;
         }
     }
@@ -134,7 +136,7 @@ internal static class CrashPresenter
 
     private static void OpenModLoaderInstallPage(McInstance instance)
     {
-        PageRouter.Navigate(PageType.InstanceSetup, PageSubType.VersionInstall, instance);
+        PageRouter.Navigate(PageIds.InstanceSetup, SubPageIds.VersionInstall, instance);
     }
 
     private static void OpenDirectFile(CrashLogEntry directFile)
@@ -150,17 +152,17 @@ internal static class CrashPresenter
         Basics.OpenPath(filePath);
     }
 
-    private static void ExportReport(
+    private static async Task ExportReportAsync(
         CrashAnalysisContext context,
         List<string>? extraFiles)
     {
         string? fileAddress = null;
         try
         {
-            fileAddress = SelectReportSavePath();
+            fileAddress = await SelectReportSavePathAsync();
             if (string.IsNullOrEmpty(fileAddress)) return;
 
-            Exporter.Export(context, fileAddress, extraFiles);
+            CrashReportExporter.Export(context, fileAddress, extraFiles);
             UiInteraction.Hint(
                 Lang.Text("Crash.Report.Export.Success"),
                 NotificationType.Success);
@@ -171,14 +173,14 @@ internal static class CrashPresenter
             LogWrapper.Error(ex, "Crash", "导出错误报告失败");
             var message = CreateExportFailureMessage(fileAddress, ex);
             var copyPressed = false;
-            UiInteraction.Message(
+            await UiInteraction.MessageAsync(
                 message,
                 Lang.Text("Crash.Export.Failed.Title"),
                 Lang.Text("Common.Action.Confirm"),
                 Lang.Text("Crash.Export.Failed.CopyDetails"),
                 button2Action: () => copyPressed = true);
-            if (copyPressed)
-                PlatformServices.Clipboard?.SetText(message);
+            if (copyPressed && PlatformServices.Clipboard is { } clipboard)
+                await clipboard.SetTextAsync(message);
         }
     }
 
@@ -187,17 +189,15 @@ internal static class CrashPresenter
         var summary = string.IsNullOrWhiteSpace(targetZipPath)
             ? Lang.Text("Crash.Export.Failed.MessageWithoutPath")
             : Lang.Text("Crash.Export.Failed.Message", targetZipPath);
-        return ExceptionDetails.Compose(summary, exception);
+        return ExceptionDetails.ComposeForDialog(summary, exception);
     }
 
-    private static string? SelectReportSavePath()
+    private static Task<string> SelectReportSavePathAsync()
     {
-        string? fileAddress = null;
-        LauncherCommon.RunInUiWait(() => fileAddress = SystemDialogs.SelectSaveFile(
+        return SystemDialogs.SelectSaveFileAsync(
             Lang.Text("Crash.Report.SaveDialog.Title"),
             GetDefaultReportFileName(),
-            Lang.Text("Crash.Report.SaveDialog.Filter")));
-        return fileAddress;
+            Lang.Text("Crash.Report.SaveDialog.Filter"));
     }
 
     private static string GetDefaultReportFileName()

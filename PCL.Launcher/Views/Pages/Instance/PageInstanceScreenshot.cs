@@ -7,13 +7,14 @@ using Avalonia.Media.Imaging;
 using Avalonia.VisualTree;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Hints;
+using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Instance;
 
 /// <summary>
-///     实例截图页：以 MyCard 图片墙展示 <c>screenshots</c> 目录中的截图缩略图，
-///     滚动到底部时按批追加；每张卡片提供打开、复制路径与删除。删除优先移入系统回收站。
+/// 实例截图页：以 MyCard 图片墙展示 <c>screenshots</c> 目录中的截图缩略图，
+/// 滚动到底部时按批追加；每张卡片提供打开、复制路径与删除。删除优先移入系统回收站。
 /// </summary>
 public partial class PageInstanceScreenshot : MyPageRight, IRefreshable
 {
@@ -47,15 +48,10 @@ public partial class PageInstanceScreenshot : MyPageRight, IRefreshable
         Reload();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         ViewModel.SetInstance(InstancePageHelper.ResolveInstance(parameter));
         PanBack.ScrollToHome();
-        Reload();
-    }
-
-    protected override void RefreshLocalization()
-    {
         Reload();
     }
 
@@ -91,7 +87,7 @@ public partial class PageInstanceScreenshot : MyPageRight, IRefreshable
         {
             var placeholder = new MyVirtualizingElement<MyCard>(() => CreateScreenshotCard(item))
             {
-                Width = 150d,
+                Width = 214d,
                 Height = 170d,
                 RecycleOffscreen = true
             };
@@ -108,7 +104,7 @@ public partial class PageInstanceScreenshot : MyPageRight, IRefreshable
     {
         var card = new MyCard
         {
-            Width = 150d,
+            Width = 200d,
             Margin = new Thickness(7d),
             Tag = item.FilePath
         };
@@ -153,10 +149,10 @@ public partial class PageInstanceScreenshot : MyPageRight, IRefreshable
         grid.Children.Add(buttons);
         card.BorderChild = grid;
         card.Opacity = 0d;
-        Animations.AniStart(
-            new[]
+        AnimationService.Run(
+            new List<IAnimation>
             {
-                Animations.AaOpacity(card, 1d, 200)
+                new OpacityAnimation(card, 1d, 200)
             });
         return card;
     }
@@ -181,10 +177,6 @@ public partial class PageInstanceScreenshot : MyPageRight, IRefreshable
             }
 
             image.Source = bitmap;
-            var ratio = bitmap.PixelSize.Height <= 0
-                ? 1d
-                : (double)bitmap.PixelSize.Width / bitmap.PixelSize.Height;
-            card.Width = Math.Clamp(120d * ratio + 16d, 120d, 420d);
         }
         catch (Exception ex)
         {
@@ -203,15 +195,17 @@ public partial class PageInstanceScreenshot : MyPageRight, IRefreshable
         }
     }
 
-    private static MyIconTextButton CreateActionButton(string textKey, string icon)
+    private static MyIconButton CreateActionButton(string textKey, string icon)
     {
-        return new MyIconTextButton
+        var button = new MyIconButton
         {
-            Text = Lang.Text(textKey),
             SvgIcon = icon,
-            LogoScale = 0.8d,
-            Margin = new Thickness(2d, 0d)
+            Width = 25d,
+            Height = 25d,
+            Margin = new Thickness(6d, 0d)
         };
+        button.SetLocalizedValue(ToolTip.TipProperty, textKey);
+        return button;
     }
 
     private Task CopyAsync(ScreenshotItemViewModel item)

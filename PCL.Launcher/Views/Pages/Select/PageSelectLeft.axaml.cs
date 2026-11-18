@@ -4,15 +4,15 @@ using Avalonia.Input;
 using Avalonia.Threading;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Navigation;
 using PCL.UI.Controls;
 using PCL.UI.Controls.Common;
 
 namespace PCL.Views.Pages.Select;
 
 /// <summary>
-///     Minecraft 文件夹选择页左栏：文件夹的排序、拖拽、重命名、增删与切换。
-///     显示名不允许包含 <c>&gt;</c> 与 <c>|</c>（它们是 <see cref="States.Game" /> 中文件夹列表的分隔符），
-///     新增与重命名都走带校验规则的输入弹窗。
+/// Minecraft 文件夹选择页左栏：文件夹的排序、拖拽、重命名、增删与切换。 显示名不允许包含 <c>&gt;</c> 与 <c>|</c>（它们是
+/// <see cref="States.Game" /> 中文件夹列表的分隔符）， 新增与重命名都走带校验规则的输入弹窗。
 /// </summary>
 public partial class PageSelectLeft : MyPageLeft, IRefreshable
 {
@@ -48,20 +48,13 @@ public partial class PageSelectLeft : MyPageLeft, IRefreshable
         RefreshCurrent();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         RefreshOnNavigate();
     }
 
     public override void OnNavigatedFrom()
     {
-    }
-
-    protected override void RefreshLocalization()
-    {
-        ViewModel.InvalidateFolders();
-        if (_refreshed)
-            McFolderListUi();
     }
 
     private void RefreshOnNavigate()
@@ -98,11 +91,11 @@ public partial class PageSelectLeft : MyPageLeft, IRefreshable
             PanList.Children.Clear();
             _rows.Clear();
 
-            PanList.Children.Add(CreateSectionTitle(Lang.Text("Select.Folder.ListTitle")));
+            PanList.Children.Add(CreateSectionTitle("Select.Folder.ListTitle"));
             foreach (var folder in ViewModel.Folders)
                 PanList.Children.Add(CreateFolderItem(folder));
 
-            PanList.Children.Add(CreateSectionTitle(Lang.Text("Select.Folder.AddOrImport")));
+            PanList.Children.Add(CreateSectionTitle("Select.Folder.AddOrImport"));
             if (ViewModel.CanCreateFolder)
                 PanList.Children.Add(
                     CreateActionItem(
@@ -121,7 +114,7 @@ public partial class PageSelectLeft : MyPageLeft, IRefreshable
                     "Select.Folder.ImportModpack.Title",
                     "lucide/package-plus",
                     "Select.Folder.ImportModpack.ToolTip",
-                    PageSelectLeftViewModel.InstallModpack));
+                    () => { _ = PageSelectLeftViewModel.InstallModpack(); }));
             PanList.Children.Add(
                 new Border
                 {
@@ -139,7 +132,7 @@ public partial class PageSelectLeft : MyPageLeft, IRefreshable
         {
             _isBuilding = false;
             // 只有文件夹列表或选中项确实变化时才触发实例列表刷新，
-            // 避免每次导航/本地化重建都重复启动加载器。
+            // 避免每次导航重建都重复启动加载器。
             if (rebuilt)
                 PageSelectLeftViewModel.ReloadInstanceList();
         }
@@ -157,6 +150,7 @@ public partial class PageSelectLeft : MyPageLeft, IRefreshable
             Height = 40,
             Tag = folder
         };
+        LocalizedText.TryBind(item, "Title", () => folder.DisplayName);
         item.Changed += (sender, e) => FolderChanged((MyListItem)sender, e);
         AttachDragHandlers(item, folder);
 
@@ -177,13 +171,11 @@ public partial class PageSelectLeft : MyPageLeft, IRefreshable
         return item;
     }
 
-    private static TextBlock CreateSectionTitle(string text)
+    private static TextBlock CreateSectionTitle(string titleKey)
     {
-        var title = new TextBlock
-        {
-            Text = text
-        };
+        var title = new TextBlock();
         title.Classes.Add("SectionTitle");
+        title.SetLocalizedValue(TextBlock.TextProperty, titleKey);
         return title;
     }
 
@@ -197,12 +189,12 @@ public partial class PageSelectLeft : MyPageLeft, IRefreshable
         {
             Type = MyListItem.CheckType.Clickable,
             IsScaleAnimationEnabled = false,
-            Title = Lang.Text(titleKey),
             Height = 34,
             LogoScale = 0.9,
             SvgIcon = svgIcon
         };
-        ToolTip.SetTip(item, Lang.Text(toolTipKey));
+        item.SetLocalizedValue(MyListItem.TitleProperty, titleKey);
+        item.SetLocalizedValue(ToolTip.TipProperty, toolTipKey);
         ToolTip.SetPlacement(item, PlacementMode.Right);
         item.Click += (_, _) => action();
         return item;
@@ -271,11 +263,11 @@ public partial class PageSelectLeft : MyPageLeft, IRefreshable
         {
             var item = new MyMenuItem
             {
-                Header = Lang.Text(headerKey),
                 SvgIcon = svgIcon,
                 IsEnabled = enabled,
                 IsVisible = visible
             };
+            item.SetLocalizedValue(MenuItem.HeaderProperty, headerKey);
             item.Click += (_, _) => action();
             items.Add(item);
         }

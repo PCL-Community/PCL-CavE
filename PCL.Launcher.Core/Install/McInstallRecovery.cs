@@ -138,13 +138,18 @@ public static class McInstallRecovery
 
     /// <summary>
     ///     安装加载器进入结束状态后调用：成功时删除备份，失败或取消时回滚到安装前状态。
+    ///     实例修改页与迁移前一致，成功后保留 <c>PCLInstallBackups</c>。
     /// </summary>
-    public static void HandleTerminalState(Loading.LoaderBase loader, string instanceFolder)
+    public static void HandleTerminalState(
+        Loading.LoaderBase loader,
+        string instanceFolder,
+        bool keepBackupOnSuccess = false)
     {
         if (loader.State == LoadState.Finished)
         {
             var folder = NormalizeFolder(instanceFolder);
-            DeleteBackupQuietly(folder);
+            if (!keepBackupOnSuccess)
+                DeleteBackupQuietly(folder);
             UnregisterSession(folder);
             return;
         }

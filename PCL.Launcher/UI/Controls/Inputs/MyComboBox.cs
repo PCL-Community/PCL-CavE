@@ -3,7 +3,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using FluentValidation;
@@ -17,7 +19,7 @@ namespace PCL.UI.Controls;
 ///     <see cref="DropDownWidthSync" />、<see cref="TextChanged" /> 事件与
 ///     “可编辑文本与选项不一致时取消选中”的修正；可编辑文本由 <see cref="MyTextBox" /> 承载，
 ///     通过 <see cref="ValidateRules" /> 参与校验并显示错误文本。
-///     前景/背景色经 <c>PCL.Animations</c> 过渡；动画关闭时直接落到终值。
+///     前景/背景色经 新动画引擎 过渡；动画关闭时直接落到终值。
 /// </summary>
 public class MyComboBox : ComboBox
 {
@@ -166,18 +168,18 @@ public class MyComboBox : ComboBox
         var target = IsDropDownOpen ? 180d : 0d;
         if (!animate || !InputAnimation.CanAnimate(this))
         {
-            PCL.Animations.AniStop(GlyphKey);
+            AnimationService.CancelAnimationByName(GlyphKey);
             rotate.Angle = target;
             return;
         }
 
-        PCL.Animations.AniStart(
-            PCL.Animations.AaRotateTransform(
+        AnimationService.Run(
+            new RotateTransformAnimation(
                 _dropDownGlyph,
                 target - rotate.Angle,
                 200,
-                ease: new PCL.Animations.AniEaseOutFluent(
-                    PCL.Animations.AniEasePower.Strong)),
+                ease: new FluentEaseOut(
+                    EasePower.Strong)),
             GlyphKey);
     }
 
@@ -202,6 +204,10 @@ public class MyComboBox : ComboBox
         if (_editableTextBox is not null)
         {
             _editableTextBox.TextChanged -= EditableTextBox_TextChanged;
+            _editableTextBox.GotFocus -= EditableTextBox_GotFocus;
+            _editableTextBox.RemoveHandler(
+                PointerPressedEvent,
+                (EventHandler<PointerPressedEventArgs>)EditableTextBox_PointerPressed);
             _editableTextBox = null;
         }
 
@@ -229,6 +235,11 @@ public class MyComboBox : ComboBox
             }
 
             _editableTextBox.TextChanged += EditableTextBox_TextChanged;
+            _editableTextBox.GotFocus += EditableTextBox_GotFocus;
+            _editableTextBox.AddHandler(
+                PointerPressedEvent,
+                (EventHandler<PointerPressedEventArgs>)EditableTextBox_PointerPressed,
+                RoutingStrategies.Tunnel);
             _editableTextBox.Tag = Tag;
             _editableTextBox.PlaceholderText = HintText;
             _editableTextBox.CaretBrush = InputTheme.TextSecondary(this);
@@ -334,6 +345,9 @@ public class MyComboBox : ComboBox
         if (_popup is not null && !double.IsNaN(Bounds.Width))
             _popup.MinWidth = DropDownWidthSync ? 0d : Bounds.Width;
 
+        if (IsEditable)
+            _editableTextBox?.SelectAll();
+
         // 由键盘打开时直接采用键盘高亮，由指针打开时采用悬停高亮。
         SetKeyboardNavigation(_lastInputFromKeyboard);
 
@@ -354,7 +368,7 @@ public class MyComboBox : ComboBox
         if (IsEditable && SelectedItem is not null)
             FillEditableText(GetItemDisplayText(SelectedItem));
 
-        if (IsLoaded && !PCL.Animations.AniExitsAnyControl())
+        if (IsLoaded && !AnimationService.IsSuspended)
             CustomEventService.Raise(this);
     }
 
@@ -379,11 +393,12 @@ public class MyComboBox : ComboBox
 
     private static string GetItemDisplayText(object? item)
     {
-        if (item is null)
-            return string.Empty;
-        if (item is ContentControl content)
-            return content.Content?.ToString() ?? string.Empty;
-        return item.ToString() ?? string.Empty;
+        return item switch
+        {
+            null => string.Empty,
+            ContentControl content => content.Content?.ToString() ?? string.Empty,
+            _ => item.ToString() ?? string.Empty
+        };
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -392,6 +407,8 @@ public class MyComboBox : ComboBox
         _lastInputFromKeyboard = true;
 
         if (IsDropDownOpen)
+            // ReSharper disable once SwitchStatementMissingSomeEnumCasesNoDefault
+            // 能不能不要提示给 200 多个 Key 加进来了
             switch (e.Key)
             {
                 case Key.Up:
@@ -472,6 +489,21 @@ public class MyComboBox : ComboBox
             _popupContent.Opacity = source.Opacity;
     }
 
+    private void EditableTextBox_GotFocus(object? sender, FocusChangedEventArgs e)
+    {
+        _editableTextBox?.SelectAll();
+    }
+
+    private void EditableTextBox_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (_editableTextBox is null || _editableTextBox.IsFocused) return;
+        if (!e.GetCurrentPoint(_editableTextBox).Properties.IsLeftButtonPressed) return;
+
+        _editableTextBox.Focus();
+        _editableTextBox.SelectAll();
+        e.Handled = true;
+    }
+
     private void EditableTextBox_TextChanged(object? sender, TextChangedEventArgs e)
     {
         // 非可编辑模式下模板仍会把 Text 同步到隐藏文本框，这里不向外转发变化
@@ -507,6 +539,16 @@ public class MyComboBox : ComboBox
     }
 
     // 容器
+
+    private static readonly FuncTemplate<Panel?> InlineItemsPanel = new(() => new StackPanel());
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        if (ItemsSource is null && !IsSet(ItemsPanelProperty))
+            ItemsPanel = InlineItemsPanel;
+    }
 
     protected override Control CreateContainerForItemOverride(
         object? item,

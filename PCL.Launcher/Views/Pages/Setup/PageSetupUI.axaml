@@ -2,7 +2,9 @@
                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                 xmlns:ui="using:PCL.UI.Controls"
                 xmlns:loc="using:PCL.Core.UI"
-                x:CompileBindings="False"
+                xmlns:vm="using:PCL"
+                x:DataType="vm:PageSetupUIViewModel"
+                x:CompileBindings="True"
                 x:Class="PCL.Views.Pages.Setup.PageSetupUI">
     <ui:MyScrollViewer x:Name="PanBack"
                        HorizontalScrollBarVisibility="Disabled"
@@ -27,7 +29,7 @@
                                    Text="{loc:Loc Setup.Ui.Basic.Opacity}" />
                         <ui:MySlider x:Name="SliderLauncherOpacity"
                                      Grid.Column="1"
-                                     Grid.ColumnSpan="5"
+                                     Grid.ColumnSpan="4"
                                      MaxValue="600"
                                      ValueByKey="10"
                                      Value="{Binding LauncherOpacity, Mode=TwoWay}" />
@@ -97,10 +99,6 @@
                                        SelectedIndex="{Binding DarkColorSelectedIndex, Mode=TwoWay}" />
                     </Grid>
 
-                    <ui:MyCheckBox x:Name="CheckLauncherLogo"
-                                   Height="22"
-                                   Margin="-1,0,0,7"
-                                   Text="{loc:Loc Setup.Ui.Basic.ShowLogo}" />
                     <ui:MyCheckBox x:Name="CheckLockWindowSize"
                                    Height="22"
                                    Margin="-1,0,0,7"
@@ -492,11 +490,12 @@
                     <ui:MyHint x:Name="HintCustom"
                                Margin="0,15,0,-4"
                                Theme="Blue"
-                               Text="{loc:Loc Setup.Ui.Homepage.HintReferToModSetup}" />
+                               IsVisible="False" />
                     <ui:MyHint x:Name="HintCustomWarn"
                                Margin="0,15,0,6"
                                Theme="Yellow"
                                CanClose="True"
+                               IsVisible="False"
                                RelativeSetup="HintCustomWarn"
                                Text="{loc:Loc Setup.Ui.Homepage.NetWarning}" />
                     <Grid x:Name="PanCustomLocal"

@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
+using PCL.Core.Platform;
 using PCL.Core.Utils;
 using PCL.Core.Utils.OS;
 using PCL.Core.Utils.Secret;
@@ -29,7 +30,7 @@ public static partial class GameLaunch
 
     private static void _SetJavaGpuPreference(string javaExePath)
     {
-        if (!PCL.Core.Platform.PlatformRuntime.Current.Capabilities.SupportsGpuPreference) return;
+        if (!PlatformRuntime.Current.GpuPreference.IsSupported) return;
 
         try
         {
@@ -112,25 +113,27 @@ public static partial class GameLaunch
     {
         var userName = mcLoginLoader.output.Name;
         var clientToken = mcLoginLoader.output.ClientToken;
-        var replaceJsonString = $$"""
-                                  {
-                                    "authenticationDatabase": {
-                                      "00000111112222233333444445555566": {
-                                        "username": "{{userName.Replace("\"", "-")}}",
-                                        "profiles": {
-                                          "66666555554444433333222221111100": {
-                                              "displayName": "{{userName}}"
-                                          }
-                                        }
-                                      }
-                                    },
-                                    "clientToken": "{{clientToken}}",
-                                    "selectedUser": {
-                                      "account": "00000111112222233333444445555566",
-                                      "profile": "66666555554444433333222221111100"
-                                    }
-                                  }
-                                  """;
+        var replaceJsonString =
+            /* language=JSON */
+            $$"""
+              {
+                "authenticationDatabase": {
+                  "00000111112222233333444445555566": {
+                    "username": "{{userName.Replace("\"", "-")}}",
+                    "profiles": {
+                      "66666555554444433333222221111100": {
+                          "displayName": "{{userName}}"
+                      }
+                    }
+                  }
+                },
+                "clientToken": "{{clientToken}}",
+                "selectedUser": {
+                  "account": "00000111112222233333444445555566",
+                  "profile": "66666555554444433333222221111100"
+                }
+              }
+              """;
         return (JsonObject)LauncherCommon.GetJson(replaceJsonString);
     }
 
@@ -234,6 +237,12 @@ public static partial class GameLaunch
         if (_IsMinecraftVersionUnder1Dot1(mcReleaseTime))
             return "none";
 
+        // 13w16a ~ 13w23b 只有 en_US.lang，其它语言 NPE 会崩溃
+        var vanillaName = InstanceList.McMcInstanceSelected!.Info.VanillaName ?? string.Empty;
+        if (McVersionComparer.CompareVersionGe(vanillaName, "13w16a")
+            && McVersionComparer.CompareVersionGe("13w23b", vanillaName))
+            return "en_US";
+
         var useLegacyRegionCase = _ShouldUseLegacyMinecraftLanguageCode(mcReleaseTime);
         var languageCode = shouldUseLauncherLanguage
             ? LocalizationService.CurrentLanguage.Code
@@ -319,11 +328,10 @@ public static partial class GameLaunch
     {
         try
         {
+            var scriptService = ApplicationRuntime.GetService<ILaunchScriptService>()
+                ?? throw new InvalidOperationException("启动脚本服务尚未初始化");
             var scriptPath = currentLaunchOptions!.SaveBatch
-                ?? Path.Combine(
-                    LauncherPaths.ExecutableDirectory,
-                    "PCL",
-                    PCL.Core.Platform.PlatformRuntime.Current.Capabilities.UsesWindowsPaths ? "LatestLaunch.bat" : "LatestLaunch.sh");
+                ?? Path.Combine(Paths.Data, "LatestLaunch" + scriptService.FileExtension);
             LauncherCommon.WriteFile(
                 scriptPath,
                 LogFilter.FilterAccessToken(
@@ -333,16 +341,7 @@ public static partial class GameLaunch
                 mcLaunchJavaSelected!.Installation.MajorVersion > 8
                     ? Encoding.UTF8
                     : Encoding.Default);
-            if (!PCL.Core.Platform.PlatformRuntime.Current.Capabilities.UsesWindowsPaths)
-                File.SetUnixFileMode(
-                    scriptPath,
-                    UnixFileMode.UserRead
-                    | UnixFileMode.UserWrite
-                    | UnixFileMode.UserExecute
-                    | UnixFileMode.GroupRead
-                    | UnixFileMode.GroupExecute
-                    | UnixFileMode.OtherRead
-                    | UnixFileMode.OtherExecute);
+            scriptService.MakeExecutable(scriptPath);
             if (currentLaunchOptions.SaveBatch is null)
                 return false;
 
@@ -372,28 +371,19 @@ public static partial class GameLaunch
     {
         var instance = InstanceList.McMcInstanceSelected!;
         var javaInstallation = mcLaunchJavaSelected!.Installation;
-        if (PCL.Core.Platform.PlatformRuntime.Current.Capabilities.UsesWindowsPaths)
-        {
-            var chcpCommand = javaInstallation.MajorVersion > 8
-                ? "chcp 65001>nul" + "\r\n"
-                : "";
-            return $"{chcpCommand}@echo off\r\n"
-                + $"title 启动 - {instance.Name}\r\n"
-                + "echo 游戏正在启动，请稍候。\r\n"
-                + $"cd /D \"{LauncherCommon.ShortenPath(instance.PathIndie)}\"\r\n"
-                + $"{customCommandGlobal}\r\n"
-                + $"{customCommandVersion}\r\n"
-                + $"\"{javaInstallation.JavaExePath}\" {_mcLaunchArgument}\r\n"
-                + "echo 游戏已退出。\r\n"
-                + "pause";
-        }
-
-        return "#!/bin/sh\n"
-            + $"cd \"{LauncherCommon.ShortenPath(instance.PathIndie)}\"\n"
-            + $"{customCommandGlobal}\n"
-            + $"{customCommandVersion}\n"
-            + $"\"{javaInstallation.JavaExePath}\" {_mcLaunchArgument}\n"
-            + "echo 游戏已退出。\n";
+        var service = ApplicationRuntime.GetService<ILaunchScriptService>()
+            ?? throw new InvalidOperationException("启动脚本服务尚未初始化");
+        return service.CreateScript(
+            new LaunchScriptOptions(
+                LauncherCommon.ShortenPath(instance.PathIndie),
+                javaInstallation.JavaExePath,
+                _mcLaunchArgument,
+                customCommandGlobal,
+                customCommandVersion,
+                javaInstallation.MajorVersion,
+                Lang.Text("Minecraft.Launch.Script.Title", instance.Name),
+                Lang.Text("Minecraft.Launch.Script.Starting"),
+                Lang.Text("Minecraft.Launch.Script.Exited")));
     }
 
     private static void _RunCustomCommand(
@@ -406,14 +396,11 @@ public static partial class GameLaunch
         var customProcess = new Process();
         try
         {
-            var isWindows = PCL.Core.Platform.PlatformRuntime.Current.Capabilities.UsesWindowsPaths;
-            customProcess.StartInfo.FileName = isWindows ? "cmd.exe" : "/bin/sh";
-            customProcess.StartInfo.Arguments =
-                isWindows ? $"/c \"{command}\"" : $"-c \"{command}\"";
-            customProcess.StartInfo.WorkingDirectory =
-                LauncherCommon.ShortenPath(GameFolders.mcFolderSelected!);
-            customProcess.StartInfo.UseShellExecute = false;
-            customProcess.StartInfo.CreateNoWindow = true;
+            var shell = ApplicationRuntime.GetService<IShellCommandService>()
+                ?? throw new InvalidOperationException("Shell 命令服务尚未初始化");
+            customProcess.StartInfo = shell.CreateCommand(
+                command,
+                LauncherCommon.ShortenPath(GameFolders.mcFolderSelected!));
             customProcess.Start();
 
             if (!waitForExit()) return;
@@ -486,80 +473,36 @@ public static partial class GameLaunch
     }
 
     /// <summary>
-    ///     将 Java 目录添加到游戏进程的 PATH 环境变量开头。
-    ///     Windows 使用 "Path" 与 ";"，其余平台使用 "PATH" 与 Path.PathSeparator。
+    /// 将 Java 目录添加到游戏进程的 PATH 环境变量开头。 Windows 使用 "Path" 与 ";"，其余平台使用 "PATH" 与
+    /// Path.PathSeparator。
     /// </summary>
     private static void _PrependJavaFolderToPathVariable(
         ProcessStartInfo startInfo,
         string javaFolder)
     {
-        var separator = Path.PathSeparator;
-        var javaFolderPath = LauncherCommon.ShortenPath(javaFolder);
-        if (PCL.Core.Platform.PlatformRuntime.Current.Capabilities.UsesWindowsPaths)
-        {
-            var paths = new List<string>(
-                (startInfo.EnvironmentVariables["Path"] ?? "").Split(separator))
-            {
-                javaFolderPath
-            };
-            startInfo.EnvironmentVariables["Path"] =
-                paths.Distinct().ToList().Join(separator.ToString());
-            return;
-        }
-
-        startInfo.Environment.TryGetValue("PATH", out var currentPath);
-        var unixPaths = new List<string>((currentPath ?? "").Split(separator))
-        {
-            javaFolderPath
-        };
-        startInfo.Environment["PATH"] = unixPaths.Distinct().ToList().Join(separator.ToString());
+        var service = ApplicationRuntime.GetService<IProcessEnvironmentService>()
+            ?? throw new InvalidOperationException("进程环境服务尚未初始化");
+        service.PrependPathVariable(startInfo, LauncherCommon.ShortenPath(javaFolder));
     }
 
-    /// <summary>
-    ///     非 Windows 平台通过 PRIME 相关环境变量请求游戏进程使用独立显卡；Windows 走注册表设置。
-    /// </summary>
+    /// <summary>通过平台服务准备独立显卡相关的启动环境。</summary>
     private static void _ApplyGpuPreferenceEnvironment(ProcessStartInfo startInfo, bool enabled)
     {
-        if (PCL.Core.Platform.PlatformRuntime.Current.Kind != PCL.Core.Platform.PlatformKind.Linux || !enabled) return;
-
-        // Mesa（AMD/Intel）的 PRIME 渲染卸载；没有独立显卡时驱动会回退到默认设备
-        startInfo.Environment["DRI_PRIME"] = "1";
-        if (!File.Exists("/proc/driver/nvidia/version")) return;
-
-        // NVIDIA PRIME Render Offload；仅在 NVIDIA 驱动存在时注入，避免强制 GLX vendor 导致初始化失败
-        startInfo.Environment["__NV_PRIME_RENDER_OFFLOAD"] = "1";
-        startInfo.Environment["__GLX_VENDOR_LIBRARY_NAME"] = "nvidia";
-        startInfo.Environment["__VK_LAYER_NV_optimus"] = "NVIDIA_only";
-        McLaunchLog("已通过环境变量请求使用独立显卡（NVIDIA PRIME Render Offload）");
+        var environment = PlatformRuntime.Current.LaunchEnvironment;
+        if (!environment.IsSupported) return;
+        environment.ApplyGpuPreference(startInfo, enabled, McLaunchLog);
     }
 
-    /// <summary>
-    ///     非 Windows 平台用 Mesa 环境变量实现渲染器选择；Windows 由 Mesa Loader javaagent 处理。
-    /// </summary>
+    /// <summary>通过平台服务应用渲染器选择。</summary>
     private static void _ApplyRendererEnvironment(ProcessStartInfo startInfo)
     {
-        if (PCL.Core.Platform.PlatformRuntime.Current.Kind != PCL.Core.Platform.PlatformKind.Linux) return;
+        var environment = PlatformRuntime.Current.LaunchEnvironment;
+        if (!environment.IsSupported) return;
 
         var instanceRenderer = Config.Instance.Renderer[
             InstanceList.McMcInstanceSelected!.PathInstance];
         var renderer = instanceRenderer != 0 ? instanceRenderer - 1 : Config.Launch.Renderer;
-        switch (renderer)
-        {
-            case 1:
-                // llvmpipe：Mesa 软件渲染
-                startInfo.Environment["LIBGL_ALWAYS_SOFTWARE"] = "1";
-                startInfo.Environment["GALLIUM_DRIVER"] = "llvmpipe";
-                break;
-            case 2:
-                // d3d12 是 Windows 专有的 Mesa 后端，Linux 没有等价实现
-                McLaunchLog("d3d12 渲染器在 Linux 上没有等价实现，使用系统默认渲染器");
-                break;
-            case >= 3:
-                // zink：OpenGL over Vulkan
-                startInfo.Environment["MESA_LOADER_DRIVER_OVERRIDE"] = "zink";
-                startInfo.Environment["GALLIUM_DRIVER"] = "zink";
-                break;
-        }
+        environment.ApplyRenderer(startInfo, renderer, McLaunchLog);
     }
 
     private static void _ApplyProcessPriority(Process gameProcess)
@@ -567,21 +510,14 @@ public static partial class GameLaunch
         try
         {
             gameProcess.PriorityBoostEnabled = true;
-            switch (Config.Launch.ProcessPriority)
+            gameProcess.PriorityClass = Config.Launch.ProcessPriority switch
             {
-                case GameProcessPriority.RealTime:
-                    gameProcess.PriorityClass = ProcessPriorityClass.RealTime;
-                    break;
-                case GameProcessPriority.High:
-                    gameProcess.PriorityClass = ProcessPriorityClass.High;
-                    break;
-                case GameProcessPriority.AboveNormal:
-                    gameProcess.PriorityClass = ProcessPriorityClass.AboveNormal;
-                    break;
-                case GameProcessPriority.BelowNormal:
-                    gameProcess.PriorityClass = ProcessPriorityClass.BelowNormal;
-                    break;
-            }
+                GameProcessPriority.RealTime => ProcessPriorityClass.RealTime,
+                GameProcessPriority.High => ProcessPriorityClass.High,
+                GameProcessPriority.AboveNormal => ProcessPriorityClass.AboveNormal,
+                GameProcessPriority.BelowNormal => ProcessPriorityClass.BelowNormal,
+                _ => gameProcess.PriorityClass
+            };
         }
         catch (Exception ex)
         {
@@ -606,7 +542,7 @@ public static partial class GameLaunch
 
         var jStackPath = Path.Combine(
             mcLaunchJavaSelected!.Installation.JavaFolder,
-            PCL.Core.Platform.PlatformRuntime.Current.Capabilities.UsesWindowsPaths ? "jstack.exe" : "jstack");
+            PlatformRuntime.Current.Java.JstackExecutableName);
 
         var watcher = new GameWatcher.Watcher(
             loader,
@@ -727,9 +663,7 @@ public static partial class GameLaunch
         States.Instance.LaunchCount[instancePath] += 1;
     }
 
-    /// <summary>
-    ///     对替换标记进行处理。会对替换内容使用 EscapeHandler 进行转义。
-    /// </summary>
+    /// <summary>对替换标记进行处理。会对替换内容使用 EscapeHandler 进行转义。</summary>
     private static string? ArgumentReplace(
         string? text,
         bool replaceTime,

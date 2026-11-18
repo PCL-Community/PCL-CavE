@@ -186,11 +186,6 @@ public static partial class Config
     [ConfigGroup("Preference")] partial class PreferenceConfigGroup
     {
         /// <summary>
-        /// 启动时显示 Logo。
-        /// </summary>
-        [ConfigItem<bool>("UiLauncherLogo", true, ConfigSource.Local)] public partial bool ShowStartupLogo { get; set; }
-
-        /// <summary>
         /// 锁定窗口大小。
         /// </summary>
         [ConfigItem<bool>("UiLockWindowSize", false)] public partial bool LockWindowSize { get; set; }

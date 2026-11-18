@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
@@ -11,17 +12,19 @@ using PCL.Core.App.Localization;
 using PCL.Core.Logging;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
+using PCL.Navigation;
 using PCL.UI.Controls;
 using PCL.UI.Xaml;
 using PCL.Views.Pages.Homepage;
 using PCL.Views.Shell;
+using PCL.Xaml;
 
 namespace PCL.Views.Pages.Launch;
 
 /// <summary>
-///     启动页右栏：按 <c>Preference.Homepage</c> 配置构建主页内容，另带社区版提示与启动日志卡片。
-///     主页来源分为空白、内置“你知道吗”、Minecraft 信息流与运行时 XAML 主页四类；
-///     运行时 XAML 通过白名单渲染器转换，支持预设、本地文件、URL、缓存与 CustomLive.json 实时补丁。
+/// 启动页右栏：按 <c>Preference.Homepage</c> 配置构建主页内容，另带社区版提示与启动日志卡片。
+/// 主页来源分为空白、内置“你知道吗”、Minecraft 信息流与运行时 XAML 主页四类； 运行时内容支持旧 WPF XAML 与 AXAML
+/// 两种格式，统一走预设、本地文件、URL、 缓存与 CustomLive.json 实时补丁流程。
 /// </summary>
 public partial class PageLaunchRight : MyPageRight, IRefreshable
 {
@@ -40,21 +43,17 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
             ["opacity"] = "Opacity"
         };
 
-    private readonly TextBlock _labError;
     private readonly TextBlock _labHint1;
     private readonly TextBlock _labHint2;
     private readonly TextBlock _labLog;
     private readonly PageHomepageNewsView _newsView;
     private readonly MyScrollViewer _panBack;
     private readonly StackPanel _panCustom;
-    private readonly MyCard _panError;
     private readonly MyCard _panHint;
-    private readonly MyCard _panLoading;
     private readonly MyCard _panLog;
 
     private bool _communityHintDialogOpen;
 
-    private HomepageContent? _currentContent;
     private DispatcherTimer? _homepageLivePatchTimer;
     private FileSystemWatcher? _homepageLiveWatcher;
     private bool _initialContentPending;
@@ -68,15 +67,11 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
 
         _panBack = this.FindControl<MyScrollViewer>("PanBack")!;
         _panCustom = this.FindControl<StackPanel>("PanCustom")!;
-        _panLoading = this.FindControl<MyCard>("PanLoading")!;
-        _panError = this.FindControl<MyCard>("PanError")!;
         _panHint = this.FindControl<MyCard>("PanHint")!;
         _panLog = this.FindControl<MyCard>("PanLog")!;
-        _labError = this.FindControl<TextBlock>("LabError")!;
         _labHint1 = this.FindControl<TextBlock>("LabHint1")!;
         _labHint2 = this.FindControl<TextBlock>("LabHint2")!;
         _labLog = this.FindControl<TextBlock>("LabLog")!;
-        this.FindControl<MyTextButton>("BtnRetry")!.Click += (_, _) => ForceRefresh();
         PanScroll = _panBack;
 
         _newsView = new PageHomepageNewsView();
@@ -84,14 +79,10 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
         FileDragHandler.CustomHomepageDropped += _ => ForceRefresh();
 
         _panHint.IsVisible = States.Hint.CEMessage;
-        LocalizedText.TryBind(
-            _labHint1,
-            "Text",
-            () => Lang.Text("Launch.Right.CommunityHint.Message"));
-        LocalizedText.TryBind(
-            _labHint2,
-            "Text",
-            () => Lang.Text("Launch.Right.CommunityHint.HidePrompt"));
+        _labHint1.SetLocalizedValue(TextBlock.TextProperty, "Launch.Right.CommunityHint.Message");
+        _labHint2.SetLocalizedValue(
+            TextBlock.TextProperty,
+            "Launch.Right.CommunityHint.HidePrompt");
         this.FindControl<MyIconButton>("BtnHintClose")!.Click += (_, _) => HideCommunityHint();
 
         _panLog.IsVisible = LauncherCommon.ModeDebug;
@@ -145,7 +136,7 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
             Dispatcher.UIThread.Post(() => _labLog.Text = "");
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
     }
 
@@ -166,9 +157,6 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
         var version = Interlocked.Increment(ref _refreshVersion);
         _initialContentPending = true;
         _pendingBackgroundContent = null;
-        _panLoading.IsVisible = true;
-        _panError.IsVisible = false;
-        _labError.Text = "";
         EnsureHomepageLiveWatcher();
 
         Task.Run(() =>
@@ -202,10 +190,9 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
                 _initialContentPending = false;
                 try
                 {
-                    _panLoading.IsVisible = false;
                     if (content.ErrorMessage is { Length: > 0 } error)
                     {
-                        ShowError(error);
+                        ShowHomepageError(error);
                         return;
                     }
 
@@ -213,11 +200,12 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
                     {
                         // 新下载没有可复用的缓存：按 WPF 行为先清空旧页。
                         _panCustom.Children.Clear();
-                        _panLoading.IsVisible = true;
+                        _panHint.Margin = new Thickness(0d, 0d, 0d, 15d);
                         return;
                     }
 
                     LoadContent(content);
+                    _panBack.ScrollToHome();
                 }
                 finally
                 {
@@ -244,12 +232,9 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
 
         _communityHintDialogOpen = true;
         var closeButton = this.FindControl<MyIconButton>("BtnHintClose");
-        if (closeButton is not null)
-            closeButton.IsEnabled = false;
+        closeButton?.IsEnabled = false;
         try
         {
-            // Avalonia 没有 WPF 的 DispatcherFrame；UI 线程上的同步 ForceWait
-            // 只跑 RunJobs，不处理原生输入，会让输入框永久卡住。
             var result = await DialogService.Instance.ShowAsync(
                 new InputDialogRequest
                 {
@@ -268,14 +253,13 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
                 return;
             }
 
-            Animations.AniDispose(_panHint, true);
+            AnimationService.DisposeControl(_panHint, true);
             States.Hint.CEMessage = false;
         }
         finally
         {
             _communityHintDialogOpen = false;
-            if (closeButton is not null)
-                closeButton.IsEnabled = true;
+            closeButton?.IsEnabled = true;
         }
     }
 
@@ -300,35 +284,30 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
                 return;
             }
 
-            _panLoading.IsVisible = false;
-            ShowError(error);
+            ShowHomepageError(error);
             return;
         }
 
-        _panLoading.IsVisible = false;
         LoadContent(content);
     }
 
     private void LoadContent(HomepageContent content)
     {
-        _currentContent = content;
         switch (content.Kind)
         {
             case HomepageSourceKind.Blank:
                 LogWrapper.Info("Launch", "[Page] 实例化：清空主页 UI，来源为空");
                 _panCustom.Children.Clear();
-                _panLoading.IsVisible = false;
-                _panError.IsVisible = false;
+                _panHint.Margin = new Thickness(0d, 0d, 0d, 15d);
                 break;
 
             case HomepageSourceKind.Removed:
-                DialogService.Instance.Show(
+                DialogService.Instance.ShowNotification(
                     new TextDialogRequest
                     {
                         Title = Lang.Text("Common.Dialog.Title"),
                         Content = Lang.Text("Launch.Homepage.Preset.EchoCave.Removed"),
-                        Buttons = DialogButtons.Ok,
-                        ForceWait = true
+                        Buttons = DialogButtons.Ok
                     });
                 break;
 
@@ -339,16 +318,12 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
                         content.TriviaText ?? "",
                         ForceRefresh,
                         key => FindResource(key) as IBrush));
-                _panLoading.IsVisible = false;
-                _panError.IsVisible = false;
                 break;
 
             case HomepageSourceKind.NewsFeed:
                 _panCustom.Children.Clear();
                 _panCustom.Children.Add(_newsView);
                 _newsView.Reload();
-                _panLoading.IsVisible = false;
-                _panError.IsVisible = false;
                 break;
 
             case HomepageSourceKind.CustomXaml:
@@ -363,9 +338,9 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
         if (string.IsNullOrWhiteSpace(content.Xaml))
         {
             if (content.ErrorMessage is { Length: > 0 } error)
-                ShowError(error);
+                ShowHomepageError(error);
             else
-                ShowError(
+                ShowHomepageError(
                     Lang.Text(
                         "Launch.Homepage.LoadFailed.Message",
                         Lang.Text("Launch.Homepage.LoadFailed.Title")));
@@ -373,16 +348,40 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
             return;
         }
 
-        var rendered = RuntimeXamlRenderer.RenderFragment(
-            PageHelpDetailViewModel.ReplaceArguments(content.Xaml),
-            FindResource);
+        var xaml = PageHelpDetailViewModel.ReplaceArguments(content.Xaml);
+        var format = HomepageXamlFormatDetector.Detect(xaml);
+        if (format == HomepageXamlFormat.Avalonia)
+        {
+            var avaloniaResult = HomepageAvaloniaRenderer.Render(xaml);
+            if (avaloniaResult.Error is { Length: > 0 }
+                || avaloniaResult.Root is null)
+            {
+                var avaloniaError = avaloniaResult.Error ?? "未知渲染错误";
+                LogWrapper.Error(
+                    new InvalidOperationException(avaloniaError),
+                    "Launch",
+                    $"[Page] AXAML 主页渲染失败：{content.SourceText}");
+                ShowHomepageError(
+                    Lang.Text(
+                        "Launch.Homepage.LoadFailed.Message",
+                        avaloniaError));
+                return;
+            }
+
+            _panCustom.Children.Clear();
+            _panCustom.Children.Add(avaloniaResult.Root);
+            ApplyHomepageLivePatchesFromFile();
+            return;
+        }
+
+        var rendered = RuntimeXamlRenderer.RenderFragment(xaml, FindResource);
         if (!rendered.Success)
         {
             LogWrapper.Error(
                 new InvalidOperationException(rendered.Error ?? "未知渲染错误"),
                 "Launch",
                 $"[Page] 运行时 XAML 主页渲染失败：{content.SourceText}");
-            ShowError(
+            ShowHomepageError(
                 Lang.Text(
                     "Launch.Homepage.LoadFailed.Message",
                     rendered.Error ?? Lang.Text("Launch.Homepage.LoadFailed.Title")));
@@ -391,7 +390,7 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
 
         if (rendered.Controls.Count == 0)
         {
-            ShowError(
+            ShowHomepageError(
                 Lang.Text(
                     "Launch.Homepage.LoadFailed.Message",
                     "主页中没有可显示的内容"));
@@ -402,9 +401,6 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
         foreach (var control in rendered.Controls)
             _panCustom.Children.Add(control);
 
-        _panLoading.IsVisible = false;
-        _panError.IsVisible = false;
-        _labError.Text = "";
         ApplySanitizeHints(rendered);
         ApplyHomepageLivePatchesFromFile();
     }
@@ -420,24 +416,39 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
                 Hints.Error(Lang.Text("Event.Sanitize.UnknownTypeHint", unknown)));
     }
 
-    private void ShowError(string message)
+    private void ShowHomepageError(string message)
     {
-        _labError.Text = message;
-        _panError.IsVisible = true;
-        _panLoading.IsVisible = false;
+        LogWrapper.Info("Launch", $"[Page] 主页加载失败：{message}");
+        if (LauncherCommon.ModeDebug)
+        {
+            _ = ShowHomepageErrorDialogAsync(message);
+            return;
+        }
+
+        HintService.Show(Hints.Error(Lang.Text("Launch.Homepage.LoadFailed.Title")));
     }
 
-    /// <inheritdoc />
-    protected override void RefreshLocalization()
+    private async Task ShowHomepageErrorDialogAsync(string message)
     {
-        if (_currentContent is not { } content)
-            return;
-        if (content.Kind is not (HomepageSourceKind.CustomXaml or HomepageSourceKind.Trivia))
-            return;
-        if (content.Kind == HomepageSourceKind.CustomXaml
-            && string.IsNullOrWhiteSpace(content.Xaml))
-            return;
-        LoadContent(content);
+        try
+        {
+            var result = await DialogService.Instance.ShowAsync(
+                new TextDialogRequest
+                {
+                    Title = Lang.Text("Launch.Homepage.LoadFailed.Title"),
+                    Content = Lang.Text("Launch.Homepage.LoadFailed.Message", message),
+                    Buttons = DialogButtons.Create(
+                        "Launch.Homepage.LoadFailed.Retry",
+                        "Common.Action.Cancel"),
+                    HighLight = false
+                });
+            if (result.IsConfirmed)
+                ForceRefresh();
+        }
+        catch (Exception ex)
+        {
+            LogWrapper.Debug(ex, "Launch", "显示主页错误弹窗失败");
+        }
     }
 
     private object? FindResource(string key)
@@ -666,46 +677,56 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
 
     private static IEnumerable<JsonObject> EnumerateHomepageLivePatches(JsonNode token)
     {
-        if (token is JsonObject obj)
+        switch (token)
         {
-            if (TryGetProperty(obj, "patches", out var patchesNode)
-                && patchesNode is JsonArray patches)
+            case JsonObject obj
+                when TryGetProperty(obj, "patches", out var patchesNode)
+                && patchesNode is JsonArray patches:
             {
                 foreach (var patch in patches.OfType<JsonObject>())
                     yield return patch;
                 yield break;
             }
 
-            if (TryGetString(obj, "target", "tag", "name") is not null)
+            case JsonObject obj
+                when TryGetString(obj, "target", "tag", "name") is not null:
             {
                 yield return obj;
                 yield break;
             }
 
-            foreach (var property in obj)
+            case JsonObject obj:
             {
-                if (property.Value is not JsonObject patch)
-                    continue;
-                var copy = (JsonObject)JsonNode.Parse(
-                    patch.ToJsonString(),
-                    new JsonNodeOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    },
-                    new JsonDocumentOptions
-                    {
-                        CommentHandling = JsonCommentHandling.Skip,
-                        AllowTrailingCommas = true
-                    })!;
-                if (!TryGetProperty(copy, "target", out _))
-                    copy["target"] = property.Key;
-                yield return copy;
+                foreach (var property in obj)
+                {
+                    if (property.Value is not JsonObject patch)
+                        continue;
+
+                    var copy = (JsonObject)JsonNode.Parse(
+                        patch.ToJsonString(),
+                        new JsonNodeOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        },
+                        new JsonDocumentOptions
+                        {
+                            CommentHandling = JsonCommentHandling.Skip,
+                            AllowTrailingCommas = true
+                        })!;
+                    if (!TryGetProperty(copy, "target", out _))
+                        copy["target"] = property.Key;
+                    yield return copy;
+                }
+
+                break;
             }
-        }
-        else if (token is JsonArray array)
-        {
-            foreach (var patch in array.OfType<JsonObject>())
-                yield return patch;
+
+            case JsonArray array:
+            {
+                foreach (var patch in array.OfType<JsonObject>())
+                    yield return patch;
+                break;
+            }
         }
     }
 
@@ -766,21 +787,20 @@ public partial class PageLaunchRight : MyPageRight, IRefreshable
 
         try
         {
-            if (allowedPropertyName == "ToolTip")
+            switch (allowedPropertyName)
             {
-                ToolTip.SetTip(element, value);
-                return true;
-            }
+                case "ToolTip":
+                    ToolTip.SetTip(element, value);
+                    return true;
 
-            if (allowedPropertyName == "Visibility")
-            {
-                element.IsVisible = value.Trim().ToLowerInvariant() switch
-                {
-                    "visible" or "true" or "1" => true,
-                    "collapsed" or "hidden" or "false" or "0" => false,
-                    _ => element.IsVisible
-                };
-                return true;
+                case "Visibility":
+                    element.IsVisible = value.Trim().ToLowerInvariant() switch
+                    {
+                        "visible" or "true" or "1" => true,
+                        "collapsed" or "hidden" or "false" or "0" => false,
+                        _ => element.IsVisible
+                    };
+                    return true;
             }
 
             var property = element

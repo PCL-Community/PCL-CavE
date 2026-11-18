@@ -6,16 +6,25 @@ namespace PCL.Core.UI.Animation.Core;
 public readonly struct FromToAnimationFrame<T>(
     IAnimatable target,
     T value,
-    T startValue) : IAnimationFrame
+    T startValue,
+    bool isRelative = false) : IAnimationFrame
 {
     public IAnimatable Target { get; init; } = target;
     public T Value { get; init; } = value;
     public T StartValue { get; init; } = startValue;
+    public bool IsRelative { get; init; } = isRelative;
+
+    public void Apply()
+    {
+        var current = IsRelative ? Target.GetValue() : null;
+        var absolute = current is null
+            ? ValueProcessorManager.Add(StartValue, Value)
+            : ValueProcessorManager.Add(current, Value);
+        Target.SetValue(absolute!);
+    }
 
     public Action GetAction()
     {
-        var target = Target;
-        var absolute = ValueProcessorManager.Add(StartValue, Value);
-        return () => target.SetValue(absolute!);
+        return Apply;
     }
 }

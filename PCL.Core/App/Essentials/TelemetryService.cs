@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -9,14 +8,12 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using PCL.Core.App.IoC;
 using PCL.Core.IO.Net;
-using PCL.Core.IO.Net.Dns;
 using PCL.Core.Logging;
 using PCL.Core.Platform;
 using PCL.Core.Utils.OS;
 using PCL.Core.Utils.Secret;
 using Sentry;
 using Sentry.Extensibility;
-using STUN.Client;
 
 namespace PCL.Core.App.Essentials;
 
@@ -115,7 +112,7 @@ public sealed partial class TelemetryService
 
     private static ulong _GetPhysicalMemoryBytes()
     {
-        return PlatformRuntime.Current.SystemFacts.GetPhysicalMemoryBytes();
+        return PlatformRuntime.Current.SystemFacts.GetMemoryInfo().TotalBytes;
     }
 
     // 设备环境上报
@@ -151,27 +148,6 @@ public sealed partial class TelemetryService
 
         var appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 
-        // stun test
-        StunClient5389UDP? natTest = null;
-        var miWifiIps =
-            await DnsQuery.Instance.QueryForIpAsync(STUN_SERVER_ADDR).ConfigureAwait(false);
-        try
-        {
-            miWifiIps ??= await Dns.GetHostAddressesAsync(STUN_SERVER_ADDR).ConfigureAwait(false);
-        }
-        catch (Exception)
-        {
-            /* Ignore dns error */
-        }
-
-        if (miWifiIps is not null && miWifiIps.Length != 0)
-        {
-            natTest = new StunClient5389UDP(
-                new IPEndPoint(miWifiIps.First(), 3478),
-                new IPEndPoint(IPAddress.Any, 0));
-            await natTest.QueryAsync().ConfigureAwait(false);
-        }
-
         var telemetry = new TelemetryDeviceEnvironment
         {
             Tag = "Telemetry",
@@ -192,8 +168,6 @@ public sealed partial class TelemetryService
             UsedHmcl = Directory.Exists(Path.Combine(appDataFolder, ".hmcl")),
             UsedBakaXl = Directory.Exists(Path.Combine(appDataFolder, "BakaXL")),
             Memory = _GetPhysicalMemoryBytes(),
-            NatMapBehaviour = natTest?.State.MappingBehavior.ToString(),
-            NatFilterBehaviour = natTest?.State.FilteringBehavior.ToString(),
             Ipv6Status = NetworkInterfaceUtils.GetIPv6Status().ToString()
         };
 
@@ -238,8 +212,6 @@ public sealed partial class TelemetryService
         [JsonPropertyName("UsedHMCL")] public required bool UsedHmcl { get; set; }
         [JsonPropertyName("UsedBakaXL")] public required bool UsedBakaXl { get; set; }
         public required ulong Memory { get; set; }
-        public required string? NatMapBehaviour { get; set; }
-        public required string? NatFilterBehaviour { get; set; }
         [JsonPropertyName("IPv6Status")] public required string Ipv6Status { get; set; }
     }
 

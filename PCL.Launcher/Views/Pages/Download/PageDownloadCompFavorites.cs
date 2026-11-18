@@ -16,7 +16,7 @@ public sealed partial class PageDownloadCompFavorites : MyPageRight, IPageView, 
     private const string SelectBarAnimationKey = "CompFavorites Sidebar";
 
     private int _bottomBarShownCount;
-    private bool _inited;
+    private bool _initialized;
     private bool _refreshed;
     private bool _updatingGroups;
 
@@ -30,13 +30,12 @@ public sealed partial class PageDownloadCompFavorites : MyPageRight, IPageView, 
         HintGetFail.Cursor = new Cursor(StandardCursorType.Hand);
         Btn_ManageTargetFav.Click += (_, _) => ShowManageMenu();
 
-        ViewModel.StateChanged += ApplyLoadState;
         ViewModel.FoldersChanged += RefreshGroupCombo;
         ViewModel.SelectionChanged += RefreshSelectionBar;
         ViewModel.SearchReset += () => PanSearchBox.Text = string.Empty;
 
         KeyDown += OnPageKeyDown;
-        LocalizationService.LanguageChanged += OnLanguageChanged;
+        PageEnter += OnPageEnter;
         AttachedToVisualTree += (_, _) => EnsureInitialized();
     }
 
@@ -44,14 +43,10 @@ public sealed partial class PageDownloadCompFavorites : MyPageRight, IPageView, 
 
     private TranslateTransform SelectTransform => (TranslateTransform)CardSelect.RenderTransform!;
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         EnsureInitialized();
         ViewModel.RefreshFolders();
-        if (_refreshed)
-            return;
-        _refreshed = true;
-        ViewModel.Reload();
     }
 
     public override void OnNavigatedFrom()
@@ -66,11 +61,21 @@ public sealed partial class PageDownloadCompFavorites : MyPageRight, IPageView, 
         ViewModel.Reload();
     }
 
+    private void OnPageEnter()
+    {
+        EnsureInitialized();
+        ViewModel.RefreshFolders();
+        if (_refreshed)
+            return;
+        _refreshed = true;
+        ViewModel.Reload();
+    }
+
     private void EnsureInitialized()
     {
-        if (_inited)
+        if (_initialized)
             return;
-        _inited = true;
+        _initialized = true;
         var loader = ViewModel.EnsureLoader();
         PageLoaderInit(
             Load,
@@ -78,18 +83,14 @@ public sealed partial class PageDownloadCompFavorites : MyPageRight, IPageView, 
             PanContent,
             null,
             loader,
+            inputInvoke: () => 0,
             autoRun: false);
-        Load.Click += (_, _) =>
-        {
-            if (ViewModel.IsLoadFailed)
-                ViewModel.Reload();
-        };
         RefreshGroupCombo();
     }
 
     private void SearchRun(object? sender, EventArgs e)
     {
-        if (!_inited)
+        if (!_initialized)
             return;
         ViewModel.SearchText = PanSearchBox.Text;
         ViewModel.RebuildGroups();
@@ -143,20 +144,6 @@ public sealed partial class PageDownloadCompFavorites : MyPageRight, IPageView, 
         e.Handled = true;
     }
 
-    private void ApplyLoadState()
-    {
-        var busy = ViewModel.IsLoading || ViewModel.IsLoadFailed;
-        PanLoad.IsVisible = busy;
-        PanContent.IsVisible = !busy;
-    }
-
-    private void OnLanguageChanged()
-    {
-        if (!_inited)
-            return;
-        ViewModel.RebuildGroups();
-    }
-
     private void FavoriteItem_Loaded(object? sender, RoutedEventArgs e)
     {
         if (sender is not MyListItem { DataContext: FavoriteItemViewModel item } listItem)
@@ -181,16 +168,18 @@ public sealed partial class PageDownloadCompFavorites : MyPageRight, IPageView, 
         {
             SvgIcon = "lucide/pencil"
         };
-        ToolTip.SetTip(editNoteButton, Lang.Text("Download.Comp.Favorites.EditNote"));
+        editNoteButton.SetLocalizedValue(
+            ToolTip.TipProperty,
+            "Download.Comp.Favorites.EditNote");
         editNoteButton.Click += (_, _) => ViewModel.EditNoteCommand.Execute(item.Project);
 
         var unfavoriteButton = new MyIconButton
         {
             SvgIcon = "lucide/heart-filled"
         };
-        ToolTip.SetTip(
-            unfavoriteButton,
-            Lang.Text("Download.Comp.Favorites.Action.Unfavorite"));
+        unfavoriteButton.SetLocalizedValue(
+            ToolTip.TipProperty,
+            "Download.Comp.Favorites.Action.Unfavorite");
         unfavoriteButton.Click += (_, _) => ViewModel.RemoveFavorite(item);
         listItem.Buttons = [editNoteButton, unfavoriteButton];
 
@@ -214,9 +203,9 @@ public sealed partial class PageDownloadCompFavorites : MyPageRight, IPageView, 
             0d,
             ViewModel.ContentListBottomInset);
 
-        if (Animations.AniExitsAnyControl())
+        if (AnimationService.IsSuspended)
         {
-            Animations.AniStop(SelectBarAnimationKey);
+            AnimationService.CancelAnimationByName(SelectBarAnimationKey);
             _bottomBarShownCount = count;
             if (selected)
             {
@@ -244,27 +233,27 @@ public sealed partial class PageDownloadCompFavorites : MyPageRight, IPageView, 
 
             _bottomBarShownCount = count;
             CardSelect.IsVisible = true;
-            Animations.AniStart(
-                new[]
+            AnimationService.Run(
+                new List<IAnimation>
                 {
-                    Animations.AaOpacity(CardSelect, 1d - CardSelect.Opacity, 60),
-                    Animations.AaTranslateY(
+                    new OpacityAnimation(CardSelect, 1d - CardSelect.Opacity, 60),
+                    new TranslateYAnimation(
                         CardSelect,
                         -27d - SelectTransform.Y,
                         120,
-                        ease: new Animations.AniEaseOutFluent(Animations.AniEasePower.Weak)),
-                    Animations.AaTranslateY(
+                        ease: new FluentEaseOut(EasePower.Weak)),
+                    new TranslateYAnimation(
                         CardSelect,
                         3d,
                         150,
                         120,
-                        new Animations.AniEaseInoutFluent(Animations.AniEasePower.Weak)),
-                    Animations.AaTranslateY(
+                        new FluentEaseInOut(EasePower.Weak)),
+                    new TranslateYAnimation(
                         CardSelect,
                         -1d,
                         90,
                         270,
-                        new Animations.AniEaseInoutFluent(Animations.AniEasePower.Weak))
+                        new FluentEaseInOut(EasePower.Weak))
                 },
                 SelectBarAnimationKey);
             return;
@@ -273,16 +262,16 @@ public sealed partial class PageDownloadCompFavorites : MyPageRight, IPageView, 
         if (_bottomBarShownCount == 0)
             return;
         _bottomBarShownCount = 0;
-        Animations.AniStart(
-            new[]
+        AnimationService.Run(
+            new List<IAnimation>
             {
-                Animations.AaOpacity(CardSelect, -CardSelect.Opacity, 90),
-                Animations.AaTranslateY(
+                new OpacityAnimation(CardSelect, -CardSelect.Opacity, 90),
+                new TranslateYAnimation(
                     CardSelect,
                     -10d - SelectTransform.Y,
                     90,
-                    ease: new Animations.AniEaseInFluent(Animations.AniEasePower.Weak)),
-                Animations.AaCode(() => CardSelect.IsVisible = false, after: true)
+                    ease: new FluentEaseIn(EasePower.Weak)),
+                new ActionAnimation(() => CardSelect.IsVisible = false, true)
             },
             SelectBarAnimationKey);
     }
@@ -322,8 +311,8 @@ public sealed partial class PageDownloadCompFavorites : MyPageRight, IPageView, 
         try
         {
             PageRouter.Navigate(
-                PageType.CompDetail,
-                PageSubType.Default,
+                PageIds.CompDetail,
+                null,
                 new CompDetailParameter(
                     project,
                     project.Type,

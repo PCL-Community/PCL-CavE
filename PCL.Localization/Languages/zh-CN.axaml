@@ -1,9 +1,8 @@
 <!-- Formatted by xaml-lang-formatter at 2026-10-28T23:23:04. -->
-<ResourceDictionary
-    xmlns="https://github.com/avaloniaui"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
-    xml:space="preserve">
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+                    xml:space="preserve">
 
     <!-- Meta -->
 
@@ -61,22 +60,8 @@
 
     <!-- Main.Menu -->
 
-    <sys:String x:Key="Main.Menu.File">文件</sys:String>
-    <sys:String x:Key="Main.Menu.Edit">编辑</sys:String>
-    <sys:String x:Key="Main.Menu.Window">窗口</sys:String>
     <sys:String x:Key="Main.Menu.Help">帮助</sys:String>
-    <sys:String x:Key="Main.Menu.About">关于 PCL CE</sys:String>
-    <sys:String x:Key="Main.Menu.Preferences">设置…</sys:String>
-    <sys:String x:Key="Main.Menu.Hide">隐藏 PCL CE</sys:String>
-    <sys:String x:Key="Main.Menu.Quit">退出 PCL CE</sys:String>
-    <sys:String x:Key="Main.Menu.CloseWindow">关闭窗口</sys:String>
     <sys:String x:Key="Main.Menu.Minimize">最小化</sys:String>
-    <sys:String x:Key="Main.Menu.Undo">撤销</sys:String>
-    <sys:String x:Key="Main.Menu.Redo">重做</sys:String>
-    <sys:String x:Key="Main.Menu.Cut">剪切</sys:String>
-    <sys:String x:Key="Main.Menu.Copy">复制</sys:String>
-    <sys:String x:Key="Main.Menu.Paste">粘贴</sys:String>
-    <sys:String x:Key="Main.Menu.SelectAll">全选</sys:String>
 
     <!-- Common.Action -->
 
@@ -2233,6 +2218,9 @@
     <sys:String x:Key="Minecraft.Launch.Donate.Title">{0} 次启动！</sys:String>
     <sys:String x:Key="Minecraft.Launch.ExportScript.Cancelled">已取消导出启动脚本！</sys:String>
     <sys:String x:Key="Minecraft.Launch.ExportScript.Success">导出启动脚本成功！</sys:String>
+    <sys:String x:Key="Minecraft.Launch.Script.Title">启动 - {0}</sys:String>
+    <sys:String x:Key="Minecraft.Launch.Script.Starting">游戏正在启动，请稍候。</sys:String>
+    <sys:String x:Key="Minecraft.Launch.Script.Exited">游戏已退出。</sys:String>
     <sys:String x:Key="Minecraft.Launch.PurchaseHint.Later">下次一定</sys:String>
     <sys:String x:Key="Minecraft.Launch.PurchaseHint.Message">看起来你似乎没买正版...&#xA;如果觉得 Minecraft 还不错，可以购买正版支持一下，毕竟开发游戏也真的很不容易...不要一直白嫖啦。&#xA;&#xA;在验证一个正版账号之后，就不会出现这个提示了！</sys:String>
     <sys:String x:Key="Minecraft.Launch.PurchaseHint.Purchase">支持正版游戏！</sys:String>
@@ -2397,6 +2385,7 @@
     <!-- Region -->
 
     <sys:String x:Key="Region.Feature.Restricted">Minecraft 下载、补全与整合包安装功能在你所在的国家或地区不可用。</sys:String>
+    <sys:String x:Key="Region.Feature.Unknown">无法获取区域信息，暂时无法使用 Minecraft 下载、补全与整合包安装功能。</sys:String>
     <!-- Select -->
 
     <sys:String x:Key="Select.Error.OperationFailed">实例选择操作失败。请查看错误详情。</sys:String>
@@ -2994,9 +2983,9 @@
 
     <sys:String x:Key="Setup.Misc.Debug.AnimationSpeed">动画速度</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol">Linux 显示协议</sys:String>
-    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto">自动（X11）</sys:String>
+    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto">自动（{0}）</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.ToolTip">选择 Linux 下使用的显示协议，修改后需要重启启动器。&#xA;使用环境变量 PCL_FORCE_X11 或 PCL_USE_WAYLAND 将会覆盖此设置。</sys:String>
-    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip">跟随启动器默认值（X11）。</sys:String>
+    <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Auto.ToolTip">跟随启动器默认值（{0}）。</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.X11.ToolTip">使用 X11/XWayland 显示。当前兼容性和帧率最稳定，推荐保持。</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Wayland.ToolTip">使用原生 Wayland 显示。实验性，可能出现动画卡顿或窗口行为差异。</sys:String>
     <sys:String x:Key="Setup.Misc.Debug.LinuxProtocol.Restart">显示协议已保存，需要重启启动器后生效。</sys:String>
@@ -3027,6 +3016,7 @@
     <sys:String x:Key="Setup.Misc.Network.Proxy.Password">密码</sys:String>
     <sys:String x:Key="Setup.Misc.Network.Proxy.System">使用系统代理</sys:String>
     <sys:String x:Key="Setup.Misc.Network.Proxy.UntrustedWarning">请勿填写不信任的代理地址</sys:String>
+    <sys:String x:Key="Setup.Misc.Network.Proxy.CustomHint">比如 http://127.0.0.1:1080/</sys:String>
     <sys:String x:Key="Setup.Misc.Network.Proxy.Username">账号</sys:String>
 
     <!-- Setup.Misc.System -->
@@ -3130,7 +3120,6 @@
     <sys:String x:Key="Setup.Ui.Basic.LockWindow">锁定启动器大小</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Opacity">不透明度</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Opacity2">不透明度</sys:String>
-    <sys:String x:Key="Setup.Ui.Basic.ShowLogo">打开启动器时显示 PCL CE 图标</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.ShowTriviaHint">在启动游戏时显示"你知道吗"</sys:String>
     <sys:String x:Key="Setup.Ui.Basic.Title">基础</sys:String>
 
@@ -3278,8 +3267,8 @@
     <sys:String x:Key="Setup.Update.CheckAgain">再次检查</sys:String>
     <sys:String x:Key="Setup.Update.CheckFailed">检查更新时出错</sys:String>
     <sys:String x:Key="Setup.Update.Checking">正在检查更新...</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">下载 .NET 10 运行时</sys:String>
-    <sys:String x:Key="Setup.Update.DotNetMissing.Message">发现了启动器更新（版本 {0}），但是新版本要求你的电脑安装 .NET 10 才可以运行。&#xA;你需要先安装 .NET 10 才可以继续更新。&#xA;&#xA;点击下方按钮打开网页，然后选择 ⌈.NET 桌面运行时⌋ 中的 {1} 选项下载。</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.DownloadRuntime">下载 .NET 11 运行时</sys:String>
+    <sys:String x:Key="Setup.Update.DotNetMissing.Message">发现了启动器更新（版本 {0}），但是新版本要求你的电脑安装 .NET 11 才可以运行。&#xA;你需要先安装 .NET 11 才可以继续更新。&#xA;&#xA;点击下方按钮打开网页，然后选择 ⌈.NET 桌面运行时⌋ 中的 {1} 选项下载。</sys:String>
     <sys:String x:Key="Setup.Update.DotNetMissing.Title">启动器更新 - 缺少运行环境</sys:String>
     <sys:String x:Key="Setup.Update.Error.NetworkFailed">无法获取最新版本信息，请检查网络连接</sys:String>
     <sys:String x:Key="Setup.Update.Install">下载并安装</sys:String>
@@ -3348,7 +3337,7 @@
     <sys:String x:Key="SystemDialog.File.SelectTitle">选择文件</sys:String>
     <sys:String x:Key="SystemDialog.Folder.OpenFailed.Message">无法打开文件资源管理器。请尝试关闭安全软件（例如 360 安全卫士）。&#xA;&#xA;路径：{0}</sys:String>
     <sys:String x:Key="SystemDialog.Folder.SelectTitle">选择文件夹</sys:String>
-    <sys:String x:Key="SystemDialog.Startup.DotNetRuntimeOutdated.Message">你的 .NET 桌面运行时已过期或损坏。请重新安装 .NET 10。</sys:String>
+    <sys:String x:Key="SystemDialog.Startup.DotNetRuntimeOutdated.Message">你的 .NET 桌面运行时已过期或损坏。请重新安装 .NET 11。</sys:String>
     <sys:String x:Key="SystemDialog.Startup.InitializationTitle">PCL CE 初始化失败</sys:String>
 
     <!-- SystemDialog.Error -->
@@ -3356,7 +3345,7 @@
     <sys:String x:Key="SystemDialog.Error.Detail.WithException">{0}&#xA;&#xA;详细信息：&#xA;{1}</sys:String>
     <sys:String x:Key="SystemDialog.Error.Message.WithLogExportGuidance">{0}&#xA;&#xA;若要寻求帮助，请不要关闭启动器。请立即导出日志（设置 → 查看日志 → 导出日志），并发送导出的日志压缩包；仅发送此窗口的截图通常无法帮助定位问题。</sys:String>
     <sys:String x:Key="SystemDialog.Error.OperationFailed.Message">执行操作时发生错误。&#xA;&#xA;操作信息：&#xA;{0}&#xA;&#xA;详细信息：&#xA;{1}</sys:String>
-    <sys:String x:Key="SystemDialog.Error.OperationFailed.RuntimeMessage">执行操作时发生错误。&#xA;&#xA;操作信息：&#xA;{0}&#xA;&#xA;详细信息：&#xA;{1}&#xA;&#xA;与系统底层交互失败。请尝试重新安装 .NET 10。</sys:String>
+    <sys:String x:Key="SystemDialog.Error.OperationFailed.RuntimeMessage">执行操作时发生错误。&#xA;&#xA;操作信息：&#xA;{0}&#xA;&#xA;详细信息：&#xA;{1}&#xA;&#xA;与系统底层交互失败。请尝试重新安装 .NET 11。</sys:String>
     <sys:String x:Key="SystemDialog.Error.Title">错误</sys:String>
     <sys:String x:Key="SystemDialog.Error.Unexpected.Message">发生意外错误。</sys:String>
     <sys:String x:Key="SystemDialog.Error.Unexpected.Title">发生意外错误</sys:String>
@@ -3682,7 +3671,6 @@
 
     <sys:String x:Key="Tools.Test.Dependency.MissingTitle">缺少依赖</sys:String>
     <sys:String x:Key="Instance.Export.Task.Prefix">导出实例</sys:String>
-    <sys:String x:Key="Application.Loading.Status.Preparing">准备中</sys:String>
     <sys:String x:Key="Download.Feature.Migrating">正在迁移</sys:String>
     <sys:String x:Key="Download.Feature.Migrating.Description">正在迁移下载数据，请稍候。</sys:String>
     <sys:String x:Key="Download.Install.Finished">安装完成</sys:String>

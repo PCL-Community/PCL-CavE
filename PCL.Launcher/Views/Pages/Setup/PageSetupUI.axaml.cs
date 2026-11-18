@@ -9,6 +9,7 @@ using PCL.Core.App.Localization;
 using PCL.Core.UI;
 using PCL.Core.UI.Hints;
 using PCL.Core.Utils.Validate;
+using PCL.Navigation;
 using PCL.UI.Controls;
 using PCL.UI.Controls.Common;
 using PCL.Views.Pages.Launch;
@@ -17,8 +18,8 @@ using PCL.Views.Shell;
 namespace PCL.Views.Pages.Setup;
 
 /// <summary>
-///     外观设置页：窗口透明度、深浅色模式、配色主题、字体、标题栏类型、背景、背景音乐、自定义主页与功能隐藏。
-///     状态与配置写入由 <see cref="PageSetupUIViewModel" /> 承担；页面负责动态控件构建、文件选择与标题栏刷新。
+/// 外观设置页：窗口透明度、深浅色模式、配色主题、字体、标题栏类型、背景、背景音乐、自定义主页与功能隐藏。 状态与配置写入由
+/// <see cref="PageSetupUIViewModel" /> 承担；页面负责动态控件构建、文件选择与标题栏刷新。
 /// </summary>
 public partial class PageSetupUI : MyPageRight, ISetupResetPage
 {
@@ -70,8 +71,6 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
             ViewModel.CustomNetText = TextCustomNet.Text ?? string.Empty;
         });
 
-        CheckLauncherLogo.Change += (_, _) => WriteIfReady(() =>
-            Config.Preference.ShowStartupLogo = CheckLauncherLogo.Checked == true);
         CheckLockWindowSize.Change += (_, _) => WriteIfReady(() =>
             Config.Preference.LockWindowSize = CheckLockWindowSize.Checked == true);
         CheckShowLaunchingHint.Change += (_, _) => WriteIfReady(() =>
@@ -204,7 +203,7 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         }
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack.ScrollToHome();
         if (_loaded) Reload();
@@ -216,32 +215,12 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
     {
     }
 
-    protected override void RefreshLocalization()
-    {
-        if (!_loaded) return;
-        _reloading = true;
-        try
-        {
-            BuildThemeColorItems();
-            BuildHideGrid();
-        }
-        finally
-        {
-            _reloading = false;
-        }
-
-        Reload();
-        RefreshBackgroundState();
-        RefreshMusicState();
-    }
-
     public void Reload()
     {
         _reloading = true;
         try
         {
             ViewModel.Reload(Math.Max(1, ComboLightColor.ItemCount));
-            CheckLauncherLogo.Checked = Config.Preference.ShowStartupLogo;
             CheckLockWindowSize.Checked = Config.Preference.LockWindowSize;
             CheckShowLaunchingHint.Checked = Config.Preference.ShowLaunchingHint;
 
@@ -315,11 +294,13 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         {
             combo.Items.Clear();
             for (var i = 0; i < count; i++)
-                combo.Items.Add(
-                    new MyComboBoxItem
-                    {
-                        Content = Lang.Text(ThemeColorKeys[i].Key)
-                    });
+            {
+                var item = new MyComboBoxItem();
+                item.SetLocalizedValue(
+                    ContentControl.ContentProperty,
+                    ThemeColorKeys[i].Key);
+                combo.Items.Add(item);
+            }
         }
     }
 
@@ -341,6 +322,28 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         PanCustomLocal.IsVisible = type == 1;
         PanCustomNet.IsVisible = type == 2;
         PanCustomPreset.IsVisible = type == 3;
+
+        var showHint = type is 1 or 2;
+        HintCustom.IsVisible = showHint;
+        HintCustomWarn.IsVisible = showHint && !States.Hint.UntrustedHomepage;
+        if (showHint)
+        {
+            HintCustom.SetLocalizedValue(
+                MyHint.TextProperty,
+                type == 1
+                    ? "Setup.Ui.Homepage.LocalFile.Hint"
+                    : "Setup.Ui.Homepage.NetUpdate.Hint");
+            CustomEventService.SetEventType(
+                HintCustom,
+                type == 2 ? EventType.OpenUrl : EventType.None);
+            CustomEventService.SetEventData(
+                HintCustom,
+                type == 2
+                    ? "https://github.com/PCL-Community/PCL-CE/discussions"
+                    : "");
+        }
+
+        CardCustom.TriggerForceResize();
     }
 
     private static void RefreshTitleBar()
@@ -440,11 +443,11 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
             var musicAvailable = !hasMusic || service?.IsMusicAvailable == true;
             ViewModel.ApplyMusicState(hasMusic, count);
             BtnMusicRefresh.IsEnabled = musicAvailable;
-            ToolTip.SetTip(
-                BtnMusicRefresh,
+            BtnMusicRefresh.SetLocalizedValue(
+                ToolTip.TipProperty,
                 musicAvailable
-                    ? Lang.Text("Setup.Ui.Music.Refresh.ToolTip")
-                    : Lang.Text("Tools.GameLink.Finish.Unavailable"));
+                    ? "Setup.Ui.Music.Refresh.ToolTip"
+                    : "Tools.GameLink.Finish.Unavailable");
             ToolTip.SetShowOnDisabled(BtnMusicRefresh, true);
         }
         catch (Exception ex)
@@ -492,9 +495,9 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
 
     private static string LogoPath => Path.Combine(Paths.Data, "Logo.png");
 
-    private static void OnChangeLogo()
+    private static async void OnChangeLogo()
     {
-        var fileName = SystemDialogs.SelectFile(
+        var fileName = await SystemDialogs.SelectFileAsync(
             Lang.Text("Setup.Ui.ImageFile.Filter"),
             Lang.Text("Setup.Ui.ImageFile.SelectTitle"));
         if (string.IsNullOrEmpty(fileName)) return;
@@ -513,9 +516,9 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         }
     }
 
-    private void RadioLogoType3_PreviewCheck(object? sender, RouteEventArgs e)
+    private async void RadioLogoType3_PreviewCheck(object? sender, RouteEventArgs e)
     {
-        if (_selectingLogo || !e.raiseByMouse || Animations.AniExitsAnyControl()) return;
+        if (_selectingLogo || !e.raiseByMouse || AnimationService.IsSuspended) return;
         if (File.Exists(LogoPath))
         {
             RefreshTitleBar();
@@ -525,7 +528,7 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         _selectingLogo = true;
         try
         {
-            var fileName = SystemDialogs.SelectFile(
+            var fileName = await SystemDialogs.SelectFileAsync(
                 Lang.Text("Setup.Ui.ImageFile.Filter"),
                 Lang.Text("Setup.Ui.ImageFile.SelectTitle"));
             if (string.IsNullOrEmpty(fileName))
@@ -618,64 +621,84 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
             "Setup.Ui.FeatureHide.MainPage",
             true,
             [
-                new("UiHiddenPageDownload", "Setup.Ui.FeatureHide.Item.Download"),
-                new("UiHiddenPageSetup", "Setup.Ui.FeatureHide.Item.Settings"),
-                new("UiHiddenPageTools", "Setup.Ui.FeatureHide.Item.Tools")
+                new HideCheckDefinition(
+                    "UiHiddenPageDownload",
+                    "Setup.Ui.FeatureHide.Item.Download"),
+                new HideCheckDefinition("UiHiddenPageSetup", "Setup.Ui.FeatureHide.Item.Settings"),
+                new HideCheckDefinition("UiHiddenPageTools", "Setup.Ui.FeatureHide.Item.Tools")
             ]);
 
         AddHideGroup(
             "Setup.Ui.FeatureHide.SubSetup",
             false,
             [
-                new("UiHiddenSetupLaunch", "Setup.Ui.FeatureHide.Item.Launch"),
-                new("UiHiddenSetupJava", null, "Java"),
-                new("UiHiddenSetupGameManage", "Setup.Ui.FeatureHide.Item.GameManage"),
-                new("UiHiddenSetupGameLink", "Setup.Ui.FeatureHide.Item.GameLink"),
-                new("UiHiddenSetupUi", "Setup.Ui.FeatureHide.Item.Ui"),
-                new("UiHiddenSetupLauncherLanguage", "Setup.Ui.FeatureHide.Item.Language"),
-                new("UiHiddenLauncherMisc", "Setup.Ui.FeatureHide.Item.Misc"),
-                new("UiHiddenSetupUpdate", "Setup.Ui.FeatureHide.Item.Update"),
-                new("UiHiddenSetupAbout", "Setup.Ui.FeatureHide.Item.About"),
-                new("UiHiddenSetupFeedback", "Setup.Ui.FeatureHide.Item.Feedback"),
-                new("UiHiddenSetupLog", "Setup.Ui.FeatureHide.Item.Log")
+                new HideCheckDefinition("UiHiddenSetupLaunch", "Setup.Ui.FeatureHide.Item.Launch"),
+                new HideCheckDefinition("UiHiddenSetupJava", null, "Java"),
+                new HideCheckDefinition(
+                    "UiHiddenSetupGameManage",
+                    "Setup.Ui.FeatureHide.Item.GameManage"),
+                new HideCheckDefinition(
+                    "UiHiddenSetupGameLink",
+                    "Setup.Ui.FeatureHide.Item.GameLink"),
+                new HideCheckDefinition("UiHiddenSetupUi", "Setup.Ui.FeatureHide.Item.Ui"),
+                new HideCheckDefinition(
+                    "UiHiddenSetupLauncherLanguage",
+                    "Setup.Ui.FeatureHide.Item.Language"),
+                new HideCheckDefinition("UiHiddenLauncherMisc", "Setup.Ui.FeatureHide.Item.Misc"),
+                new HideCheckDefinition("UiHiddenSetupUpdate", "Setup.Ui.FeatureHide.Item.Update"),
+                new HideCheckDefinition("UiHiddenSetupAbout", "Setup.Ui.FeatureHide.Item.About"),
+                new HideCheckDefinition(
+                    "UiHiddenSetupFeedback",
+                    "Setup.Ui.FeatureHide.Item.Feedback"),
+                new HideCheckDefinition("UiHiddenSetupLog", "Setup.Ui.FeatureHide.Item.Log")
             ]);
 
         AddHideGroup(
             "Setup.Ui.FeatureHide.SubTools",
             false,
             [
-                new("UiHiddenToolsGameLink", "Setup.Ui.FeatureHide.Item.Lobby"),
-                new("UiHiddenToolsTest", "Setup.Ui.FeatureHide.Item.Toolbox")
+                new HideCheckDefinition("UiHiddenToolsGameLink", "Setup.Ui.FeatureHide.Item.Lobby"),
+                new HideCheckDefinition("UiHiddenToolsTest", "Setup.Ui.FeatureHide.Item.Toolbox")
             ]);
 
         AddHideGroup(
             "Setup.Ui.FeatureHide.SubInstance",
             false,
             [
-                new("UiHiddenVersionEdit", "Setup.Ui.FeatureHide.Item.Edit"),
-                new("UiHiddenVersionExport", "Setup.Ui.FeatureHide.Item.Export"),
-                new("UiHiddenVersionSave", "Setup.Ui.FeatureHide.Item.Save"),
-                new("UiHiddenVersionScreenshot", "Setup.Ui.FeatureHide.Item.Screenshot"),
-                new("UiHiddenVersionMod", null, "Mod"),
-                new("UiHiddenVersionResourcePack", "Setup.Ui.FeatureHide.Item.ResourcePack"),
-                new("UiHiddenVersionShader", "Setup.Ui.FeatureHide.Item.Shader"),
-                new("UiHiddenVersionSchematic", "Setup.Ui.FeatureHide.Item.Schematic"),
-                new("UiHiddenVersionServer", "Setup.Ui.FeatureHide.Item.Server")
+                new HideCheckDefinition("UiHiddenVersionEdit", "Setup.Ui.FeatureHide.Item.Edit"),
+                new HideCheckDefinition(
+                    "UiHiddenVersionExport",
+                    "Setup.Ui.FeatureHide.Item.Export"),
+                new HideCheckDefinition("UiHiddenVersionSave", "Setup.Ui.FeatureHide.Item.Save"),
+                new HideCheckDefinition(
+                    "UiHiddenVersionScreenshot",
+                    "Setup.Ui.FeatureHide.Item.Screenshot"),
+                new HideCheckDefinition("UiHiddenVersionMod", null, "Mod"),
+                new HideCheckDefinition(
+                    "UiHiddenVersionResourcePack",
+                    "Setup.Ui.FeatureHide.Item.ResourcePack"),
+                new HideCheckDefinition(
+                    "UiHiddenVersionShader",
+                    "Setup.Ui.FeatureHide.Item.Shader"),
+                new HideCheckDefinition(
+                    "UiHiddenVersionSchematic",
+                    "Setup.Ui.FeatureHide.Item.Schematic"),
+                new HideCheckDefinition("UiHiddenVersionServer", "Setup.Ui.FeatureHide.Item.Server")
             ]);
 
         AddHideGroup(
             "Setup.Ui.FeatureHide.SpecificFeature",
             false,
             [
-                new(
+                new HideCheckDefinition(
                     "UiHiddenFunctionSelect",
                     "Setup.Ui.FeatureHide.Item.InstanceSelect",
                     TooltipKey: "Setup.Ui.FeatureHide.Item.InstanceSelect.ToolTip"),
-                new(
+                new HideCheckDefinition(
                     "UiHiddenFunctionModUpdate",
                     "Setup.Ui.FeatureHide.Item.ModUpdate",
                     TooltipKey: "Setup.Ui.FeatureHide.Item.ModUpdate.ToolTip"),
-                new(
+                new HideCheckDefinition(
                     "UiHiddenFunctionHidden",
                     "Setup.Ui.FeatureHide.Item.FeatureHide",
                     TooltipKey: "Setup.Ui.FeatureHide.Item.FeatureHide.ToolTip")
@@ -698,14 +721,14 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
         bool isFirst,
         IReadOnlyList<HideCheckDefinition> items)
     {
-        PanHidePanel.Children.Add(
-            new TextBlock
-            {
-                Text = Lang.Text(titleKey),
-                Margin = new Thickness(0d, isFirst ? 4d : 12d, 0d, 4d),
-                FontSize = 12d,
-                Opacity = 0.6d
-            });
+        var title = new TextBlock
+        {
+            Margin = new Thickness(0d, isFirst ? 4d : 12d, 0d, 4d),
+            FontSize = 12d,
+            Opacity = 0.6d
+        };
+        title.SetLocalizedValue(TextBlock.TextProperty, titleKey);
+        PanHidePanel.Children.Add(title);
 
         var wrap = new WrapPanel();
         foreach (var item in items)
@@ -720,11 +743,14 @@ public partial class PageSetupUI : MyPageRight, ISetupResetPage
             Height = 22d,
             Margin = new Thickness(0d, 0d, 12d, 4d),
             VerticalAlignment = VerticalAlignment.Center,
-            Text = definition.Literal ?? Lang.Text(definition.LangKey!),
             Tag = definition.ConfigKey
         };
+        if (definition.Literal is not null)
+            check.Text = definition.Literal;
+        else
+            check.SetLocalizedValue(MyCheckBox.TextProperty, definition.LangKey!);
         if (definition.TooltipKey is not null)
-            ToolTip.SetTip(check, Lang.Text(definition.TooltipKey));
+            check.SetLocalizedValue(ToolTip.TipProperty, definition.TooltipKey);
         check.Change += (_, _) =>
         {
             if (_reloading || check.Tag is not string tag) return;

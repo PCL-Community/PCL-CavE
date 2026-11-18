@@ -3,6 +3,7 @@ using Avalonia.Input.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using fNbt;
 using PCL.Core.App.Localization;
+using PCL.Core.Logging;
 using PCL.Core.Minecraft;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
@@ -33,6 +34,8 @@ public partial class PageInstanceServerViewModel : ViewModelBase
 
     public bool ShowEmpty => !ShowContent;
 
+    public string ListTitle => $"{Lang.Text("Instance.Server.FoundServers")} ({Servers.Count})";
+
     public string? ServersPath =>
         _instance is null ? null : Path.Combine(_instance.PathIndie, "servers.dat");
 
@@ -58,6 +61,7 @@ public partial class PageInstanceServerViewModel : ViewModelBase
         var path = ServersPath;
 
         Servers.Clear();
+        OnPropertyChanged(nameof(ListTitle));
         ShowContent = false;
         _loadedServersPath = path ?? string.Empty;
         if (path is null)
@@ -90,6 +94,7 @@ public partial class PageInstanceServerViewModel : ViewModelBase
                 }
 
             ShowContent = Servers.Count > 0;
+            OnPropertyChanged(nameof(ListTitle));
             State = AsyncState.Ready;
             return true;
         }
@@ -132,7 +137,7 @@ public partial class PageInstanceServerViewModel : ViewModelBase
                 }
                 catch (Exception ex)
                 {
-                    LauncherCommon.Log(ex, $"Ping 服务器失败：{card.Address}");
+                    LogWrapper.Warn(ex, "Launcher", $"Ping 服务器失败：{card.Address}");
                 }
                 finally
                 {
@@ -359,6 +364,7 @@ public partial class PageInstanceServerViewModel : ViewModelBase
             }
 
             Servers.Remove(card);
+            OnPropertyChanged(nameof(ListTitle));
             ShowContent = Servers.Count > 0;
             HintService.Show(Hints.Success(Lang.Text("Instance.Server.Removed")));
             return true;
@@ -385,7 +391,7 @@ public partial class PageInstanceServerViewModel : ViewModelBase
             {
                 HintService.Show(
                     Hints.Info(Lang.Text("Instance.Server.Card.ConnectingTo", card.Name)));
-                PageRouter.Navigate(PageType.Launch);
+                PageRouter.Navigate(PageIds.Launch);
             }
         }
         catch (Exception ex)

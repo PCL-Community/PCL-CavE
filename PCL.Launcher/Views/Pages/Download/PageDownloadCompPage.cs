@@ -6,28 +6,35 @@ namespace PCL.Views.Pages.Download;
 internal sealed class PageDownloadCompPage : MyPageRight, IPageView, IRefreshable
 {
     private readonly PageComp _comp;
-    private readonly Comp.CompType _type;
+    private CompSearchContext? _appliedContext;
 
     public PageDownloadCompPage(Comp.CompType type)
     {
-        _type = type;
         _comp = new PageComp
         {
-            PageType = type,
+            PageIds = type,
             SupportModrinth = type != Comp.CompType.World
         };
         _comp.SetCategoryTags(CompCategoryTags.For(type));
         _comp.CompDetailRequested += OnCompDetailRequested;
         Child = _comp;
         PanScroll = _comp.ScrollViewer;
+        ShowAlwaysWhileLoading = false;
+
+        PageLoaderInit(
+            _comp.LoadingIndicator,
+            _comp.LoadingCard,
+            _comp.ContentPanel,
+            _comp.AlwaysPanel,
+            _comp.PageLoader,
+            inputInvoke: () => _comp.BuildLoaderInput(),
+            autoRun: false);
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         _comp.ScrollViewer.ScrollToHome();
         _comp.RefreshFavoriteStatuses();
-        if (parameter is CompSearchContext context)
-            _comp.ApplySearchContext(context.TargetGameVersion, context.TargetModLoader);
     }
 
     public override void OnNavigatedFrom()
@@ -41,17 +48,35 @@ internal sealed class PageDownloadCompPage : MyPageRight, IPageView, IRefreshabl
         _comp.RefreshSearch();
     }
 
+    public void PrepareNavigation(PageParameter? parameter)
+    {
+        var context = parameter is CompSearchContext searchContext ? searchContext : null;
+        if (_comp.IsInitialized)
+        {
+            if (context is not null && context != _appliedContext)
+            {
+                _appliedContext = context;
+                _comp.ApplySearchContext(context.TargetGameVersion, context.TargetModLoader);
+            }
+
+            return;
+        }
+
+        _appliedContext = context;
+        _comp.InitializeForLoad(context);
+    }
+
     private static void OnCompDetailRequested(CompDetailParameter context)
     {
         try
         {
-            if (!PageRegistry.IsRegistered(PageType.CompDetail))
+            if (!PageRegistry.IsRegistered(PageIds.CompDetail))
             {
                 LauncherCommon.Log($"资源详情页未注册，无法打开 {context.Project?.Slug}");
                 return;
             }
 
-            PageRouter.Navigate(PageType.CompDetail, PageSubType.Default, context);
+            PageRouter.Navigate(PageIds.CompDetail, null, context);
         }
         catch (Exception ex)
         {

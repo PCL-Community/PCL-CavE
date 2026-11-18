@@ -2,13 +2,14 @@ using Avalonia.Input;
 using PCL.Core.App;
 using PCL.Core.App.Localization;
 using PCL.Core.UI.Dialogs;
+using PCL.Navigation;
 using PCL.UI.Controls;
 
 namespace PCL.Views.Pages.Setup;
 
 /// <summary>
-///     反馈页：从 GitHub Issues 拉取社区反馈并按仓库标签状态分组展示；点击条目查看详情并可跳转原帖。
-///     数据分组与行内容由 <see cref="PageSetupFeedbackViewModel" /> 负责。
+/// 反馈页：从 GitHub Issues 拉取社区反馈并按仓库标签状态分组展示；点击条目查看详情并可跳转原帖。 数据分组与行内容由
+/// <see cref="PageSetupFeedbackViewModel" /> 负责。
 /// </summary>
 public partial class PageSetupFeedback : MyPageRight, IRefreshable
 {
@@ -43,7 +44,7 @@ public partial class PageSetupFeedback : MyPageRight, IRefreshable
         PageLoaderRestart();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack.ScrollToHome();
         if (!_loaded) return;
@@ -53,12 +54,6 @@ public partial class PageSetupFeedback : MyPageRight, IRefreshable
 
     public override void OnNavigatedFrom()
     {
-    }
-
-    protected override void RefreshLocalization()
-    {
-        if (_loaded && _loader.State == LoadState.Finished)
-            RefreshList();
     }
 
     private static void LoadFeedbackList(Loading.LoaderTask<bool, List<FeedbackItem>> task)
@@ -95,8 +90,7 @@ public partial class PageSetupFeedback : MyPageRight, IRefreshable
                      """,
                 Buttons = DialogButtons.Create(
                     "Common.Action.Confirm",
-                    "Setup.Feedback.Item.ViewDetail"),
-                ForceWait = true
+                    "Setup.Feedback.Item.ViewDetail")
             });
         if (result.Button == 2)
             Basics.OpenPath(item.Url);

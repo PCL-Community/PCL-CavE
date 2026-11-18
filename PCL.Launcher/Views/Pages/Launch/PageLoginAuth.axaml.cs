@@ -1,16 +1,15 @@
 using Avalonia.Controls;
-using PCL.Core.App.Localization;
 using PCL.UI.Controls;
-using static PCL.Animations;
 
 namespace PCL.Views.Pages.Launch;
 
 /// <summary>
-///     第三方（Authlib-Injector）登录视图：支持密码与 OAuth（Yggdrasil Connect 设备码）两种模式。
-///     登录、OAuth 探测与注册链接由 <see cref="PageLoginAuthViewModel" /> 负责；页面只保留模式切换动画。
+/// 第三方（Authlib-Injector）登录视图：支持密码与 OAuth（Yggdrasil Connect 设备码）两种模式。 内置清单中的服务器直接进入
+/// OAuth，其余固定密码登录。页面只保留手动切换动画。
 /// </summary>
 public partial class PageLoginAuth : LoginPageBase
 {
+    private readonly MyButton _btnBack;
     private readonly MyTextButton _btnBackOAuth;
     private readonly MyTextButton _btnLink;
     private readonly MyButton _btnLogin;
@@ -35,53 +34,46 @@ public partial class PageLoginAuth : LoginPageBase
         _textNameTitle = this.FindControl<TextBlock>("TextNameTitle")!;
         _textPass = this.FindControl<MyPasswordBox>("TextPass")!;
         _textPassTitle = this.FindControl<TextBlock>("TextPassTitle")!;
+        _btnBack = this.FindControl<MyButton>("BtnBack")!;
         _btnBackOAuth = this.FindControl<MyTextButton>("BtnBackOAuth")!;
         _btnLogin = this.FindControl<MyButton>("BtnLogin")!;
         _btnLink = this.FindControl<MyTextButton>("BtnLink")!;
         _btnWebsite = this.FindControl<MyTextButton>("BtnWebsite")!;
         _btnUsePassword = this.FindControl<MyTextButton>("BtnUsePassword")!;
-        _btnPasswordWebsite = this.FindControl<MyTextButton>("BtnPasswordWebsite")!;
         _btnUseOAuth = this.FindControl<MyTextButton>("BtnUseOAuth")!;
+        _btnPasswordWebsite = this.FindControl<MyTextButton>("BtnPasswordWebsite")!;
 
-        ViewModel.LoginModeRequested += mode => SetLoginMode(mode);
         ViewModel.BackRequested += RequestBack;
         ViewModel.RefreshRequested += RequestRefresh;
 
         _btnUsePassword.Click += (_, _) => SetLoginMode(false);
         _btnUseOAuth.Click += (_, _) => SetLoginMode(true);
 
-        SetLoginMode(false, false);
+        ApplyListedMode(PendingAuthServer);
 
-        AttachedToVisualTree += (_, _) => LocalizationService.LanguageChanged += OnLanguageChanged;
-        DetachedFromVisualTree +=
-            (_, _) => LocalizationService.LanguageChanged -= OnLanguageChanged;
+        AttachedToVisualTree += (_, _) =>
+        {
+            if (PendingAuthServer is not null)
+                ApplyListedMode(PendingAuthServer);
+        };
     }
 
     public static string? PendingAuthServer { get; set; }
 
-    public static bool? PendingAuthServerOAuthSupported { get; set; }
-
     public PageLoginAuthViewModel ViewModel { get; } = new();
-
-    internal static Task<bool> IsOAuthSupportedAsync(string authServerUrl)
-    {
-        return PageLoginAuthViewModel.IsOAuthSupportedAsync(authServerUrl);
-    }
-
-    private void OnLanguageChanged()
-    {
-        ViewModel.RefreshLocalization();
-        ApplyModeVisibility(ViewModel.IsOAuthMode);
-        UpdateOAuthEntryVisibility();
-    }
 
     public override void Reload()
     {
         var pendingServer = PendingAuthServer;
-        var pendingOAuthSupport = PendingAuthServerOAuthSupported;
         PendingAuthServer = null;
-        PendingAuthServerOAuthSupported = null;
-        ViewModel.Reload(pendingServer, pendingOAuthSupport);
+        SetLoginMode(ViewModel.Reload(pendingServer), false);
+    }
+
+    private void ApplyListedMode(string? server)
+    {
+        ViewModel.UseOAuthVisible = PageLoginAuthViewModel.IsListedOAuthServer(server);
+        UpdateOAuthEntryVisibility();
+        SetLoginMode(ViewModel.UseOAuthVisible, false);
     }
 
     #region 模式切换
@@ -92,6 +84,8 @@ public partial class PageLoginAuth : LoginPageBase
         UpdateOAuthEntryVisibility();
         if (!animate || !shouldAnimate)
         {
+            if (!animate)
+                AnimationService.CancelAnimationByName("Profile Authentication Mode");
             ApplyModeVisibility(useOAuth);
             return;
         }
@@ -100,17 +94,18 @@ public partial class PageLoginAuth : LoginPageBase
         var animations = (
             from control in oldControls
             where control.IsVisible
-            select AaOpacity(control, -control.Opacity, 90)).ToList();
-        animations.Add(AaCode(() => ApplyModeVisibility(useOAuth), after: true));
+            select (IAnimation)new OpacityAnimation(control, -control.Opacity, 90)).ToList();
+        animations.Add(new ActionAnimation(() => ApplyModeVisibility(useOAuth), true));
         var newControls = GetModeControls(useOAuth);
         foreach (var control in newControls)
         {
             control.Opacity = 0d;
             var targetOpacity = GetModeTargetOpacity(control);
-            animations.Add(AaOpacity(control, targetOpacity, 130, 20, new AniEaseInFluent()));
+            animations.Add(
+                new OpacityAnimation(control, targetOpacity, 130, 20, new FluentEaseIn()));
         }
 
-        AniStart(animations, "Profile Authentication Mode");
+        AnimationService.Run(animations, "Profile Authentication Mode");
     }
 
     private List<Control> GetModeControls(bool oauthMode)
@@ -119,7 +114,8 @@ public partial class PageLoginAuth : LoginPageBase
             ? [_panOAuth, _btnUsePassword, _btnWebsite, _btnBackOAuth]
             :
             [
-                _textName, _textNameTitle, _panPasswordLinks, _btnLink, _btnLogin, _textPass,
+                _textName, _textNameTitle, _panPasswordLinks, _btnLink, _btnLogin, _btnBack,
+                _textPass,
                 _textPassTitle
             ];
     }
@@ -153,8 +149,7 @@ public partial class PageLoginAuth : LoginPageBase
 
     private void UpdateOAuthEntryVisibility()
     {
-        var available = ViewModel.UseOAuthVisible;
-        Grid.SetColumnSpan(_btnPasswordWebsite, available ? 1 : 3);
+        Grid.SetColumnSpan(_btnPasswordWebsite, ViewModel.UseOAuthVisible ? 1 : 3);
     }
 
     #endregion

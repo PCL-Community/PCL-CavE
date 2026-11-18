@@ -8,15 +8,16 @@ using PCL.Core.App.Localization;
 using PCL.Core.UI.Dialogs;
 using PCL.Core.UI.Hints;
 using PCL.Core.Utils.Validate;
+using PCL.Navigation;
 using PCL.UI.Controls;
-using static PCL.Animations;
+using PCL.UI.Install;
 
 namespace PCL.Views.Pages.Download;
 
 /// <summary>
-///     下载安装页：选择 Minecraft 版本后进入配置阶段，通过 <see cref="InstallLoaderSelector" />
-///     选择 11 种加载器与附属组件，并执行合并安装。提交后立即回到版本选择，进度与取消在下载任务栏。
-///     安装失败或取消后由 <see cref="McInstallRecovery" /> 清理本次安装创建的路径，可用同名实例重试。
+/// 下载安装页：选择 Minecraft 版本后进入配置阶段，通过 <see cref="InstallLoaderSelector" /> 选择 11
+/// 种加载器与附属组件，并执行合并安装。提交后立即回到版本选择，进度与取消在下载任务栏。 安装失败或取消后由 <see cref="McInstallRecovery" />
+/// 清理本次安装创建的路径，可用同名实例重试。
 /// </summary>
 public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
 {
@@ -24,12 +25,11 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
     private readonly InstallLoaderSelector _selector;
     private readonly bool _uiBuilt;
     private readonly PageDownloadInstallViewModel _vm = new();
-    private bool _startingInstall;
     private bool _instanceNameEdited;
+    private bool _startingInstall;
     private bool _updatingInstanceName;
     private JsonObject? _version;
     private string _versionIcon = $"{LauncherPaths.ImageRoot}Icons/NoIcon.png";
-    private bool _versionListBuilt;
     private string? _waitingVersionName;
 
     public PageDownloadInstall()
@@ -38,16 +38,22 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
         DataContext = _vm;
         PanScroll = PanBack;
         BtnStart.Show = false;
-        _selector = new InstallLoaderSelector(PanLoaderCards, OnSelectionChanged, _vm.Selection);
+        _selector = new InstallLoaderSelector(
+            LoaderCardsView.Host,
+            OnSelectionChanged,
+            _vm.Selection);
         _uiBuilt = true;
+
+        VersionList.Initialize(DownloadVersionListMode.Install, SelectVersion, false);
+        VersionList.Rebuilt += () => TrySelectWaitingVersion();
+        VersionList.Activate();
 
         PageLoaderInit(
             LoadMinecraft,
             PanLoad,
             PanContent,
             null,
-            GameDownload.dlClientListLoader,
-            _ => OnVersionListFinished());
+            GameDownload.dlClientListLoader);
 
         TextInstanceName.ValidatedTextChanged += (_, _) => UpdateLocation();
         TextInstanceName.TextChanged += (_, _) =>
@@ -66,37 +72,48 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
         _folderLoaderHandler = OnMcFolderListPreviewFinish;
         GameFolders.McFolderListLoader.PreviewFinish += _folderLoaderHandler;
 
-        BuildVersionListWhenReady();
         ShowSelectStage();
     }
 
-    public override void OnNavigatedTo(object? parameter)
+    public override void OnNavigatedTo(PageParameter? parameter)
     {
         PanBack?.ScrollToHome();
         _selector.Activate();
         GameFolders.McFolderListLoader.PreviewFinish -= _folderLoaderHandler;
         GameFolders.McFolderListLoader.PreviewFinish += _folderLoaderHandler;
-        if (parameter is JsonObject version)
+        switch (parameter)
         {
-            _waitingVersionName = null;
-            SelectVersion(version);
-        }
-        else if (parameter is string versionName && !string.IsNullOrWhiteSpace(versionName))
-        {
-            _waitingVersionName = versionName;
-            if (!TrySelectWaitingVersion())
+            case JsonObject version:
+            {
+                _waitingVersionName = null;
+                VersionList.Activate();
+                SelectVersion(version);
+                break;
+            }
+
+            case string versionName when !string.IsNullOrWhiteSpace(versionName):
+            {
+                VersionList.Activate();
+                _waitingVersionName = versionName;
+                if (!TrySelectWaitingVersion())
+                    ShowSelectStage();
+                break;
+            }
+
+            default:
+            {
+                _waitingVersionName = null;
+                VersionList.Activate();
                 ShowSelectStage();
-        }
-        else
-        {
-            _waitingVersionName = null;
-            ShowSelectStage();
+                break;
+            }
         }
     }
 
     public override void OnNavigatedFrom()
     {
         _selector.Deactivate();
+        VersionList.Deactivate();
         GameFolders.McFolderListLoader.PreviewFinish -= _folderLoaderHandler;
     }
 
@@ -104,13 +121,11 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
     {
         if (!_uiBuilt)
             return;
-        _versionListBuilt = false;
-        GameDownload.dlClientListLoader.Start(null, true);
+        VersionList.Refresh();
         if (_version is not null)
             _selector.SetMinecraft(_vm.VersionName, _vm.VersionUrl, false);
         else
             _selector.RefreshAll();
-        BuildVersionListWhenReady();
     }
 
     private void OnMcFolderListPreviewFinish(Loading.LoaderBase loader)
@@ -118,26 +133,9 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
         Dispatcher.UIThread.Post(() =>
         {
             UpdateLocation();
-            if (_versionListBuilt)
-                OnVersionListFinished();
+            if (VersionList.HasVersions)
+                TrySelectWaitingVersion();
         });
-    }
-
-    protected override void RefreshLocalization()
-    {
-        if (!_uiBuilt)
-            return;
-        _vm.StartButtonText = Lang.Text("Download.Install.StartDownload");
-        _selector.RefreshLocalization();
-        if (_version is not null)
-        {
-            UpdateWarnings();
-            OnSelectionChanged();
-        }
-
-        if (_versionListBuilt
-            && GameDownload.dlClientListLoader.output.Value?["versions"] is JsonArray)
-            OnVersionListFinished();
     }
 
     /// <summary>退出安装配置阶段，回到版本选择。</summary>
@@ -147,24 +145,6 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
     }
 
     #region 版本选择阶段
-
-    private void OnVersionListFinished()
-    {
-        try
-        {
-            if (PanVersions is null)
-                return;
-            if (GameDownload.dlClientListLoader.output.Value?["versions"] is not JsonArray versions)
-                return;
-            DownloadVersionList.Build(PanVersions, versions, SelectVersion);
-            _versionListBuilt = true;
-            TrySelectWaitingVersion();
-        }
-        catch (Exception ex)
-        {
-            LauncherCommon.Log(ex, "可视化安装页版本列表出错");
-        }
-    }
 
     private bool TrySelectWaitingVersion()
     {
@@ -192,9 +172,9 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
 
     private void BuildVersionListWhenReady()
     {
-        if (_versionListBuilt)
+        if (VersionList.HasVersions)
             return;
-        OnVersionListFinished();
+        VersionList.Rebuild();
     }
 
     private void ShowSelectStage()
@@ -211,16 +191,16 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
             {
                 PanSelectStage.Opacity = 0d;
                 PanSelectStage.RenderTransform = new TranslateTransform(-40d, 0d);
-                AniStart(
-                    new[]
+                AnimationService.Run(
+                    new List<IAnimation>
                     {
-                        AaOpacity(PanSelectStage, 1d, 100),
-                        AaTranslateX(
+                        new OpacityAnimation(PanSelectStage, 1d, 100),
+                        new TranslateXAnimation(
                             PanSelectStage,
                             40d,
                             200,
                             0,
-                            new AniEaseOutFluent(AniEasePower.ExtraStrong))
+                            new FluentEaseOut(EasePower.ExtraStrong))
                     },
                     "Install Stage Switch");
             }
@@ -241,8 +221,7 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
         _vm.CanStartInstall = false;
         _selector.SetMinecraft(null, null);
         BtnStart.Show = false;
-        if (!_versionListBuilt)
-            OnVersionListFinished();
+        BuildVersionListWhenReady();
         UpdateLocation();
         PanBack?.ScrollToHome();
     }
@@ -261,16 +240,16 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
             {
                 PanConfigStage.Opacity = 0d;
                 PanConfigStage.RenderTransform = new TranslateTransform(40d, 0d);
-                AniStart(
-                    new[]
+                AnimationService.Run(
+                    new List<IAnimation>
                     {
-                        AaOpacity(PanConfigStage, 1d, 100),
-                        AaTranslateX(
+                        new OpacityAnimation(PanConfigStage, 1d, 100),
+                        new TranslateXAnimation(
                             PanConfigStage,
                             -40d,
                             200,
                             0,
-                            new AniEaseOutFluent(AniEasePower.ExtraStrong))
+                            new FluentEaseOut(EasePower.ExtraStrong))
                     },
                     "Install Stage Switch");
             }
@@ -293,7 +272,7 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
         _version = version;
         _vm.VersionName = version["id"]?.ToString() ?? "";
         _vm.VersionUrl = version["url"]?.ToString();
-        _versionIcon = GetVersionIcon(version);
+        _versionIcon = DownloadVersionList.GetVersionIcon(version);
         _vm.VersionIcon = _versionIcon;
         if (string.IsNullOrEmpty(_vm.VersionName))
         {
@@ -379,52 +358,16 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
 
     private void UpdateWarnings()
     {
-        var warnings = _selector.GetWarnings();
-        var flags = _selector.GetWarningFlags();
-        _vm.LoaderWarning = string.Join(Environment.NewLine, warnings);
-        _vm.HasLoaderWarning = warnings.Count > 0;
-        _vm.ShowHintFabricApi = flags.FabricApi;
-        _vm.ShowHintLegacyFabricApi = flags.LegacyFabricApi;
-        _vm.ShowHintOptiFabric = flags.OptiFabric;
-        _vm.ShowHintOptiFabricOld = flags.OptiFabricOld;
-        _vm.ShowHintLegacyOptiFabric = flags.LegacyOptiFabric;
-        _vm.ShowHintModOptiFine = flags.ModOptiFine;
+        WarningsView.SetWarnings(_selector.GetWarningFlags());
     }
 
     private void RefreshLogo()
     {
         if (ImgLogo is null)
             return;
-        var selection = _selector.Selection;
-        var logo = selection.FabricVersion is not null || selection.LegacyFabricVersion is not null
-            ? $"{LauncherPaths.ImageRoot}Blocks/Fabric.png"
-            : selection.Forge is not null
-                ? $"{LauncherPaths.ImageRoot}Blocks/Anvil.png"
-                : selection.NeoForge is not null
-                    ? $"{LauncherPaths.ImageRoot}Blocks/NeoForge.png"
-                    : selection.LiteLoader is not null
-                        ? $"{LauncherPaths.ImageRoot}Blocks/Egg.png"
-                        : selection.OptiFine is not null
-                            ? $"{LauncherPaths.ImageRoot}Blocks/GrassPath.png"
-                            : selection.Cleanroom is not null
-                                ? $"{LauncherPaths.ImageRoot}Blocks/Cleanroom.png"
-                                : selection.LabyModCommitRef is not null
-                                    ? $"{LauncherPaths.ImageRoot}Blocks/LabyMod.png"
-                                    : _versionIcon;
+        var logo = McInstallFlow.ResolveSelectionIcon(_selector.Selection, _versionIcon);
         ImgLogo.Source = logo;
         _vm.VersionIcon = logo;
-    }
-
-    private static string GetVersionIcon(JsonObject version)
-    {
-        var file = (version["type"]?.ToString() ?? string.Empty) switch
-        {
-            "release" => "Blocks/Grass.png",
-            "snapshot" or "pending" => "Blocks/CommandBlock.png",
-            "special" => "Blocks/GoldBlock.png",
-            _ => "Blocks/CobbleStone.png"
-        };
-        return LauncherPaths.ImageRoot + file;
     }
 
     private void UpdateLocation()
@@ -480,23 +423,9 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
             }
 
             if (_selector.Selection.HasAny
-                && Config.Launch.IndieSolutionV2 is 0 or 2)
-            {
-                var isolation = await DialogService.Instance.ShowAsync(
-                    new TextDialogRequest
-                    {
-                        Title = Lang.Text("Download.Install.InstanceIsolation.Warning.Title"),
-                        Content = Lang.Text("Download.Install.InstanceIsolation.Warning.Message"),
-                        Buttons = DialogButtons.From(
-                            DialogButton.Create(
-                                Lang.Text("Download.Install.InstanceIsolation.Warning.Cancel")),
-                            DialogButton.Create(
-                                Lang.Text("Download.Install.InstanceIsolation.Warning.Continue"))),
-                        IsWarn = true
-                    });
-                if (isolation.Button != 2)
-                    return;
-            }
+                && Config.Launch.IndieSolutionV2 is 0 or 2
+                && !await McInstallFlow.ConfirmInstanceIsolationAsync())
+                return;
 
             var folder = GameFolders.mcFolderSelected;
             if (string.IsNullOrEmpty(folder))
@@ -549,49 +478,15 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
             };
             _selector.Selection.ApplyTo(request);
 
-            var identifier = McInstallPipeline.GetIdentifier(instanceFolder);
-            if (Loading.loaderTaskbar.Any(loader => loader.Identifier == identifier))
-            {
-                HintService.Show(
-                    Hints.Error(Lang.Text("Minecraft.Download.Error.InstanceDownloading")));
-                return;
-            }
-
-            List<Loading.LoaderBase> loaders;
-            try
-            {
-                loaders = McInstallPipeline.CreateInstallLoader(request, overwrite);
-            }
-            catch (CancelledException)
-            {
-                return;
-            }
-            catch (Exception ex)
-            {
-                HintService.Show(Hints.Error(ex.Message));
-                LauncherCommon.Log(ex, "开始安装失败");
-                return;
-            }
-
-            var installCombo = new Loading.LoaderCombo<string>(
+            var installCombo = McInstallFlow.TryStart(
+                request,
+                overwrite,
                 $"{name} {Lang.Text("Download.Install.Title")}",
-                loaders)
-            {
-                Identifier = identifier
-            };
-            Loading.LoaderBase.OnStateChangedUiEventHandler? onStateChanged = null;
-            onStateChanged = (loader, newState, _) =>
-            {
-                if (newState is LoadState.Waiting or LoadState.Loading)
-                    return;
-                if (onStateChanged is not null)
-                    loader.OnStateChangedUi -= onStateChanged;
-                OnInstallFinished(loader, newState, name, instanceFolder);
-            };
-            installCombo.OnStateChangedUi += onStateChanged;
-            installCombo.Start(instanceFolder);
-            Loading.LoaderTaskbarAdd(installCombo);
-            LoadingUi.Current?.RefreshDownloadButton();
+                instanceFolder,
+                "开始安装失败",
+                (loader, newState) => OnInstallFinished(loader, newState, name, instanceFolder));
+            if (installCombo is null)
+                return;
             ShowSelectStage();
         }
         finally
@@ -610,11 +505,10 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
         McInstallRecovery.HandleTerminalState(loader, instanceFolder);
         if (newState == LoadState.Finished)
         {
-            ApplyFinishedBookkeeping(instanceName);
+            McInstallFlow.ApplyFinished(instanceName);
             HintService.Show(
                 Hints.Success($"{instanceName} {Lang.Text("Download.Install.Finished")}"));
-            _versionListBuilt = false;
-            OnVersionListFinished();
+            VersionList.RefreshInstalledMarks();
             return;
         }
 
@@ -623,34 +517,7 @@ public partial class PageDownloadInstall : MyPageRight, IPageView, IRefreshable
                 newState == LoadState.Aborted
                     ? Lang.Text("Minecraft.Download.Error.InstallationCanceled")
                     : loader.Error?.Message
-                      ?? Lang.Text("Download.Install.Error.OperationFailed")));
-    }
-
-    private static void ApplyFinishedBookkeeping(string instanceName)
-    {
-        try
-        {
-            var mcFolder = GameFolders.mcFolderSelected;
-            if (string.IsNullOrEmpty(mcFolder))
-                return;
-            var iniPath = Path.Combine(mcFolder, "PCL.ini");
-            if (Config.Download.AutoSelectInstance)
-                LauncherCommon.WriteIni(iniPath, "Version", instanceName);
-            LauncherCommon.WriteIni(iniPath, "InstanceCache", "");
-            var root = mcFolder.EndsWith(Path.DirectorySeparatorChar)
-                ? mcFolder
-                : mcFolder + Path.DirectorySeparatorChar;
-            Loading.LoaderFolderRun(
-                InstanceList.mcInstanceListLoader,
-                root,
-                Loading.LoaderFolderRunType.ForceRun,
-                1,
-                $"versions{Path.DirectorySeparatorChar}");
-        }
-        catch (Exception ex)
-        {
-            LauncherCommon.Log(ex, "安装完成后刷新实例列表失败");
-        }
+                    ?? Lang.Text("Download.Install.Error.OperationFailed")));
     }
 
     #endregion
