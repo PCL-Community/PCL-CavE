@@ -149,8 +149,9 @@ public static partial class GameLaunch
         gameArguments.Add("${user_properties}", "{}");
         _AddAuthArgumentReplacements(gameArguments);
 
-        var gameSize = _GetGameWindowSize();
-        _ApplyLegacyWindowSizeFix(ref gameSize, instance);
+        var scale = GameWindowScale;
+        var gameSize = _GetGameWindowSize(scale);
+        _ApplyLegacyWindowSizeFix(ref gameSize, instance, scale);
         gameArguments.Add(
             "${resolution_width}",
             Math.Round(gameSize.Width).ToString(CultureInfo.InvariantCulture));
@@ -215,14 +216,13 @@ public static partial class GameLaunch
         gameArguments.Add("${user_type}", "msa");
     }
 
-    private static GameWindowSize _GetGameWindowSize()
+    private static GameWindowSize _GetGameWindowSize(double scale)
     {
         switch (Config.Launch.GameWindowMode)
         {
             case GameWindowSizeMode.Launcher:
             {
                 var pan = LaunchUi.GetMainPanSize();
-                var scale = GameWindowScale;
                 return new GameWindowSize(pan.Width * scale, (pan.Height - 29.5d) * scale);
             }
             case GameWindowSizeMode.Custom:
@@ -237,7 +237,7 @@ public static partial class GameLaunch
         }
     }
 
-    private static void _ApplyLegacyWindowSizeFix(ref GameWindowSize gameSize, McInstance instance)
+    private static void _ApplyLegacyWindowSizeFix(ref GameWindowSize gameSize, McInstance instance, double scale)
     {
         if (instance.Info.Drop > 120
             || mcLaunchJavaSelected!.Installation
@@ -246,7 +246,6 @@ public static partial class GameLaunch
             || instance.Info.HasForge)
             return;
 
-        var scale = GameWindowScale;
         if (scale == 1d)
             return;
 
