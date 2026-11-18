@@ -303,8 +303,10 @@ public static class PageRouter
             () =>
             {
                 if (!page.IsEffectivelyVisible) return;
-                if (DialogService.Instance.IsShowing
-                    || DialogService.Instance.HasPending)
+
+                if (DialogService.Instance.HasPending
+                    || TopLevel.GetTopLevel(page)?.FindControl<Panel>("PanDialogLayer")
+                        is { IsVisible: true })
                     return;
                 var target = page
                     .GetVisualDescendants()
