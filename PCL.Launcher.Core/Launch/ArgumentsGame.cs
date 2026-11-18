@@ -1,10 +1,16 @@
 using System.Globalization;
 using PCL.Core.App;
+using PCL.Core.Platform;
 
 namespace PCL;
 
 public static partial class GameLaunch
 {
+    private static double GameWindowScale =>
+        ApplicationRuntime.GetService<IMinecraftPlatformRules>()?.GameWindowUsesPhysicalPixels == true
+            ? LauncherCommon.Dpi / 96d
+            : 1d;
+
     private static string McLaunchArgumentsGameOld(McInstance version)
     {
         var dataList = new List<string>();
@@ -216,9 +222,8 @@ public static partial class GameLaunch
             case GameWindowSizeMode.Launcher:
             {
                 var pan = LaunchUi.GetMainPanSize();
-                return new GameWindowSize(
-                    LauncherCommon.GetPixelSize(pan.Width),
-                    LauncherCommon.GetPixelSize(pan.Height) - 29.5d * LauncherCommon.Dpi / 96d);
+                var scale = GameWindowScale;
+                return new GameWindowSize(pan.Width * scale, (pan.Height - 29.5d) * scale);
             }
             case GameWindowSizeMode.Custom:
                 return new GameWindowSize(
@@ -241,10 +246,14 @@ public static partial class GameLaunch
             || instance.Info.HasForge)
             return;
 
+        var scale = GameWindowScale;
+        if (scale == 1d)
+            return;
+
         McLaunchLog(
             $"已应用窗口大小过大修复（{mcLaunchJavaSelected.Installation.Version.Revision}）");
-        gameSize.Width /= LauncherCommon.Dpi / 96d;
-        gameSize.Height /= LauncherCommon.Dpi / 96d;
+        gameSize.Width /= scale;
+        gameSize.Height /= scale;
     }
 
     private static string _BuildClassPath(McInstance instance, List<Libraries.McLibToken> libList)

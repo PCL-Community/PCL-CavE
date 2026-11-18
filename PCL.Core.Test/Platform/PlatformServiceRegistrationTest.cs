@@ -40,4 +40,12 @@ public sealed class PlatformServiceRegistrationTest
             },
             rules.GetNativeClassifierNames(Architecture.X64).ToArray());
     }
+
+    [TestMethod]
+    public void OnlyWindowsGameWindowUsesPhysicalPixels()
+    {
+        Assert.IsTrue(new WindowsMinecraftPlatformRules().GameWindowUsesPhysicalPixels);
+        Assert.IsFalse(new LinuxMinecraftPlatformRules().GameWindowUsesPhysicalPixels);
+        Assert.IsFalse(new MacOsMinecraftPlatformRules().GameWindowUsesPhysicalPixels);
+    }
 }
