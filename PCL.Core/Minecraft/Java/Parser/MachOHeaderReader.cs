@@ -25,7 +25,7 @@ internal static class MachOHeaderReader
                 FileAccess.Read,
                 FileShare.Read);
             var header = new byte[8];
-            if (stream.Read(header, 0, header.Length) < header.Length)
+            if (stream.ReadAtLeast(header, header.Length, throwOnEndOfStream: false) < header.Length)
                 return null;
 
             if (BinaryPrimitives.ReadUInt32LittleEndian(header) == Magic64)
@@ -42,7 +42,7 @@ internal static class MachOHeaderReader
                 return null;
 
             var entries = new byte[(int)archCount * FatArchSize];
-            if (stream.Read(entries, 0, entries.Length) < entries.Length)
+            if (stream.ReadAtLeast(entries, entries.Length, throwOnEndOfStream: false) < entries.Length)
                 return null;
 
             var preferredCpuType = _GetProcessCpuType();

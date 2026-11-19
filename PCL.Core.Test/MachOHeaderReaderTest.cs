@@ -45,15 +45,18 @@ public class MachOHeaderReaderTest
             0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x0E
         };
-        var expected = RuntimeInformation.ProcessArchitecture == Architecture.Arm64
+        var expectedX8664First = RuntimeInformation.ProcessArchitecture == Architecture.Arm64
             ? (MachineType.ARM64, true)
             : (MachineType.AMD64, true);
+        var expectedArm64First = RuntimeInformation.ProcessArchitecture == Architecture.X64
+            ? (MachineType.AMD64, true)
+            : (MachineType.ARM64, true);
 
-        Assert.AreEqual(expected, _ReadBytes([
+        Assert.AreEqual(expectedX8664First, _ReadBytes([
             0xCA, 0xFE, 0xBA, 0xBE, 0x00, 0x00, 0x00, 0x02,
             .. x8664Entry, .. arm64Entry
         ]));
-        Assert.AreEqual(expected, _ReadBytes([
+        Assert.AreEqual(expectedArm64First, _ReadBytes([
             0xCA, 0xFE, 0xBA, 0xBE, 0x00, 0x00, 0x00, 0x02,
             .. arm64Entry, .. x8664Entry
         ]));
